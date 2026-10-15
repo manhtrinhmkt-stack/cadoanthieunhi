@@ -143,7 +143,7 @@ export async function loadAppDataFromFirestore(): Promise<{ masses?: any[]; song
 }
 
 export function subscribeToAppData(
-  onData: (data: { masses: any[]; songs: any[]; sheets: any[] }) => void,
+  onData: (data: { masses: any[]; songs: any[]; sheets: any[] } | null) => void,
   onError?: (err: any) => void
 ): () => void {
   const docRef = doc(db, 'app_data', APP_DATA_DOC);
@@ -157,6 +157,8 @@ export function subscribeToAppData(
           songs: Array.isArray(data?.songs) ? data.songs : [],
           sheets: Array.isArray(data?.sheets) ? data.sheets : []
         });
+      } else {
+        onData(null);
       }
     },
     (error) => {
@@ -174,7 +176,7 @@ export async function saveAppDataToFirestore(payload: { masses?: any[]; songs?: 
       songs: payload.songs ?? [],
       sheets: payload.sheets ?? [],
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
   } catch (error: any) {
     console.error('[Firestore] Failed to save app data:', error);
     throw error;
