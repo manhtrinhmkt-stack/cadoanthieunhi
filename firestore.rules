@@ -1,0 +1,24 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default catch-all: Deny direct public client writes/reads
+    // All operations are securely handled via the backend Firebase Admin SDK API
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if false;
+    }
+
+    match /sessions/{tokenId} {
+      allow read, write: if false;
+    }
+
+    match /app_data/{docId} {
+      allow read, write: if false;
+    }
+  }
+}

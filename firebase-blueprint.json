@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Account",
+      "description": "Internal user credential and profile definition",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["username", "passwordHash"]
+    },
+    "Session": {
+      "title": "User Session",
+      "description": "Active 30-day user authentication session",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "username": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastActiveAt": { "type": "string" }
+      },
+      "required": ["token", "username", "expiresAt"]
+    },
+    "CantusStore": {
+      "title": "Cantus Application Data",
+      "description": "Complete dataset including masses, songs, and sheet music archives",
+      "type": "object",
+      "properties": {
+        "masses": { "type": "array" },
+        "songs": { "type": "array" },
+        "sheets": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Internal user profiles"
+    },
+    "/sessions/{tokenId}": {
+      "schema": "Session",
+      "description": "Active session tokens"
+    },
+    "/app_data/{docId}": {
+      "schema": "CantusStore",
+      "description": "App state persistent document"
+    }
+  }
+}

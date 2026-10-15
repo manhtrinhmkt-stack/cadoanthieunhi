@@ -1,0 +1,6 @@
+{
+  "name": "Cantus – Quản lý Thánh ca & Ca đoàn",
+  "description": "Ứng dụng chuyên nghiệp quản lý lịch hát lễ, thư viện thánh ca, kho bản in, nhân sự ca đoàn và tra cứu thống kê.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
