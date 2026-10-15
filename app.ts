@@ -317,8 +317,19 @@ Yêu cầu:
   }
 });
 
-// Mount router on both /api prefix and root for maximum Vercel compatibility
+// Diagnostic Health Route
+apiRouter.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'ok',
+    message: 'Cantus API Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Mount router on all potential Vercel path variations
 app.use('/api', apiRouter);
+app.use('/api/index', apiRouter);
 app.use('/', apiRouter);
 
 // Global Error Handler middleware to ALWAYS return JSON instead of Express HTML error pages
@@ -329,4 +340,5 @@ app.use((err: any, req: any, res: any, next: any) => {
     error: err?.message || 'Lỗi xử lý hệ thống máy chủ.'
   });
 });
+
 
