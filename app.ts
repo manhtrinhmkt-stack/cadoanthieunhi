@@ -62,12 +62,15 @@ async function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
+// Router for API endpoints (handles both /api/* and /* paths gracefully on Vercel)
+const apiRouter = express.Router();
+
 // =============================================================
 // AUTHENTICATION API ROUTES
 // =============================================================
 
-// POST /api/auth/login
-app.post('/api/auth/login', async (req, res) => {
+// POST /auth/login
+apiRouter.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
 
@@ -110,8 +113,8 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/me (Session Check & Auto-Refresh)
-app.get('/api/auth/me', async (req, res) => {
+// GET /auth/me (Session Check & Auto-Refresh)
+apiRouter.get('/auth/me', async (req, res) => {
   try {
     const cookieToken = req.cookies?.cantus_session;
     const headerToken = req.headers.authorization?.startsWith('Bearer ')
@@ -154,8 +157,8 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
-// POST /api/auth/logout
-app.post('/api/auth/logout', async (req, res) => {
+// POST /auth/logout
+apiRouter.post('/auth/logout', async (req, res) => {
   try {
     const cookieToken = req.cookies?.cantus_session;
     const headerToken = req.headers.authorization?.startsWith('Bearer ')
@@ -174,8 +177,8 @@ app.post('/api/auth/logout', async (req, res) => {
   }
 });
 
-// POST /api/auth/change-password
-app.post('/api/auth/change-password', requireAuth, async (req: any, res: any) => {
+// POST /auth/change-password
+apiRouter.post('/auth/change-password', requireAuth, async (req: any, res: any) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
     const username = req.userSession.username;
@@ -211,8 +214,8 @@ app.post('/api/auth/change-password', requireAuth, async (req: any, res: any) =>
 // APP DATA STORAGE ROUTES (PROXIED TO FIRESTORE / LOCAL BACKUP)
 // =============================================================
 
-// GET /api/data/load
-app.get('/api/data/load', requireAuth, async (req: any, res: any) => {
+// GET /data/load
+apiRouter.get('/data/load', requireAuth, async (req: any, res: any) => {
   try {
     const data = await getAppData();
     res.json({ success: true, data });
@@ -222,8 +225,8 @@ app.get('/api/data/load', requireAuth, async (req: any, res: any) => {
   }
 });
 
-// POST /api/data/save
-app.post('/api/data/save', requireAuth, async (req: any, res: any) => {
+// POST /data/save
+apiRouter.post('/data/save', requireAuth, async (req: any, res: any) => {
   try {
     const { masses, songs, sheets } = req.body || {};
     await saveAppData({ masses, songs, sheets });
@@ -238,7 +241,7 @@ app.post('/api/data/save', requireAuth, async (req: any, res: any) => {
 // AI SONG SUGGESTION ENDPOINT
 // =============================================================
 
-app.post('/api/gemini/suggest-songs', requireAuth, async (req: any, res: any) => {
+apiRouter.post('/gemini/suggest-songs', requireAuth, async (req: any, res: any) => {
   try {
     const { massName, season, feastType, availableSongs, theme } = req.body;
     const ai = getGeminiClient();
@@ -313,3 +316,7 @@ Yêu cầu:
     });
   }
 });
+
+// Mount router on both /api prefix and root for maximum Vercel compatibility
+app.use('/api', apiRouter);
+app.use('/', apiRouter);

@@ -29,7 +29,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         body: JSON.stringify({ username: username.trim(), password }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = {};
+
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        if (rawText.includes('Authentication') || rawText.includes('Protection') || res.status === 401) {
+          throw new Error('Vercel đang bật chế độ "Deployment Protection" nên chặn API request. Vui lòng vào Vercel Settings -> Deployment Protection và TẮT "Standard Protection".');
+        }
+        throw new Error(`Máy chủ phản hồi trạng thái ${res.status} không đúng định dạng JSON.`);
+      }
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Tên đăng nhập hoặc mật khẩu không chính xác.');

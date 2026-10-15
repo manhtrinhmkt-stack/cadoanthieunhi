@@ -64,18 +64,21 @@ export default function App() {
         }
 
         const res = await fetch('/api/auth/me', { headers });
-        const data = await res.json();
-
-        if (res.ok && data.authenticated && data.user) {
-          setCurrentUser(data.user);
-          if (data.token) {
-            localStorage.setItem('cantus_session_token', data.token);
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.authenticated && data.user) {
+            setCurrentUser(data.user);
+            if (data.token) {
+              localStorage.setItem('cantus_session_token', data.token);
+            }
+            // Load data from backend / Firestore
+            await loadAppData(data.token || token);
+          } else {
+            setCurrentUser(null);
           }
-          // Load data from backend / Firestore
-          await loadAppData(data.token || token);
         } else {
           setCurrentUser(null);
-          localStorage.removeItem('cantus_session_token');
         }
       } catch (e) {
         console.error('[Auth] Session check failed:', e);
@@ -98,7 +101,8 @@ export default function App() {
       }
 
       const res = await fetch('/api/data/load', { headers });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const result = await res.json();
         if (result.success && result.data) {
           if (result.data.masses && result.data.masses.length > 0) {
