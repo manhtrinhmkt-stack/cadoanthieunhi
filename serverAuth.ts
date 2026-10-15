@@ -46,7 +46,19 @@ interface LocalStore {
   };
 }
 
-let inMemoryStore: LocalStore = { users: {}, sessions: {} };
+// Bootstrap in-memory store with default admin user immediately
+const defaultAdminHash = bcrypt.hashSync('admin123', 10);
+let inMemoryStore: LocalStore = {
+  users: {
+    admin: {
+      username: 'admin',
+      passwordHash: defaultAdminHash,
+      displayName: 'Ban Quản Trị',
+      createdAt: new Date().toISOString()
+    }
+  },
+  sessions: {}
+};
 
 function loadLocalStore(): LocalStore {
   try {
@@ -72,7 +84,6 @@ function saveLocalStore(store: LocalStore) {
     fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf-8');
   } catch (e) {
     // Non-fatal if filesystem is read-only
-    console.warn('[Store] Could not write store.json (in-memory preserved):', e);
   }
 }
 
@@ -112,13 +123,11 @@ try {
 
 function handleFirestoreError(context: string, err: any) {
   const msg = err?.message || String(err);
-  if (msg.includes('PERMISSION_DENIED') || msg.includes('Missing or insufficient permissions') || err?.code === 7) {
-    if (firestoreDb) {
-      console.log(`[Firestore] Permission restricted in preview environment (${context}). Seamlessly switching to local persistent store.`);
-      firestoreDb = null;
-    }
-  } else {
-    console.warn(`[Firestore Warning - ${context}]:`, msg);
+  console.warn(`[Firestore Warning - ${context}]:`, msg);
+  // Fallback seamlessly to local store on ANY Firestore credential/permission/network error
+  if (firestoreDb) {
+    console.log(`[Firestore] Switching to local store due to error in ${context}: ${msg}`);
+    firestoreDb = null;
   }
 }
 

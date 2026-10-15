@@ -320,3 +320,13 @@ Yêu cầu:
 // Mount router on both /api prefix and root for maximum Vercel compatibility
 app.use('/api', apiRouter);
 app.use('/', apiRouter);
+
+// Global Error Handler middleware to ALWAYS return JSON instead of Express HTML error pages
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('[Express Global Error]:', err);
+  res.status(500).json({
+    success: false,
+    error: err?.message || 'Lỗi xử lý hệ thống máy chủ.'
+  });
+});
+

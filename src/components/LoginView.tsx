@@ -157,7 +157,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             ) : (
               <>
                 <LogIn className="w-4 h-4 text-amber-300" />
-                <span>Đăng Nhập Hống</span>
+                <span>Đăng Nhập</span>
               </>
             )}
           </button>
