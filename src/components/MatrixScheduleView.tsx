@@ -262,8 +262,16 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 space-y-2">
       
+      {/* Mobile Horizontal Scroll Hint Indicator */}
+      <div className="sm:hidden flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-amber-900 shrink-0">
+        <span>👉 Vuốt ngang bảng để xem đầy đủ các ngày lễ</span>
+        <span className="font-extrabold bg-amber-200/80 text-amber-950 px-2 py-0.5 rounded text-[10px]">
+          {filteredMasses.length} Ngày lễ
+        </span>
+      </div>
+
       {/* EXCEL MATRIX SPREADSHEET GRID WITH STICKY HEADERS & STICKY FIRST COLUMN */}
-      <div className="flex-1 min-h-0 bg-white rounded-lg border border-stone-300 shadow-xs overflow-auto flex flex-col">
+      <div className="flex-1 min-h-0 bg-white rounded-lg border border-stone-300 shadow-2xs overflow-auto flex flex-col">
         <table className="w-full h-full border-collapse text-xs select-none">
           <thead>
             {/* Row 1: Ngày (Dates) - Sticky Top & Colored according to Liturgical Season! */}

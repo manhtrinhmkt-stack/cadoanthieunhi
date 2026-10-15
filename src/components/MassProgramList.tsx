@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Search, 
@@ -10,6 +10,7 @@ import {
   Check, 
   X, 
   ChevronDown,
+  ChevronUp,
   AlertTriangle,
   BookOpen,
   GripVertical,
@@ -18,11 +19,17 @@ import {
   Filter,
   Layers,
   FileSpreadsheet,
-  Download
+  Download,
+  LayoutGrid,
+  CheckCircle2,
+  Clock,
+  Mic,
+  Volume2
 } from 'lucide-react';
 import { MassEvent, MassProgramItem, Song, LiturgicalSeason, ProgramStatus, MassPosition } from '../types/cantus';
 import { 
   getMassPositionLabel, 
+  getMassPositionBadgeColor,
   getLiturgicalSeasonLabel, 
   getLiturgicalHeaderStyle,
   matchVietnameseText,
@@ -49,8 +56,16 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   onDuplicateMass,
   onOpenPdfPrint,
 }) => {
-  // View mode switcher: 'THEO_MUA' | 'THEO_THANG' | 'THEO_NAM' | 'BANG_EXCEL'
-  const [viewMode, setViewMode] = useState<'THEO_MUA' | 'THEO_THANG' | 'THEO_NAM' | 'BANG_EXCEL'>('BANG_EXCEL');
+  // Responsive Display Mode: CARDS (Mobile-First Day Cards) vs MATRIX (Desktop Excel Grid)
+  const [displayMode, setDisplayMode] = useState<'CARDS' | 'MATRIX'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      return 'CARDS';
+    }
+    return 'MATRIX';
+  });
+
+  // Filter View mode: 'THEO_MUA' | 'THEO_THANG' | 'THEO_NAM' | 'ALL'
+  const [viewMode, setViewMode] = useState<'THEO_MUA' | 'THEO_THANG' | 'THEO_NAM' | 'ALL'>('ALL');
 
   // Sub-filters
   const [selectedSeason, setSelectedSeason] = useState<string>('ALL');
@@ -59,20 +74,24 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   const [selectedYear, setSelectedYear] = useState<string>(currentYearStr);
   const [filterSearch, setFilterSearch] = useState<string>('');
 
-  // Mobile Sidebar Toggle
+  // Mobile Sidebar Drawer Toggle
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Modal Editor state
   const [editingMass, setEditingMass] = useState<MassEvent | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isConfirmingDeleteInModal, setIsConfirmingDeleteInModal] = useState(false);
 
   // Drag and drop state for row reordering
   const [draggedRowIndex, setDraggedRowIndex] = useState<number | null>(null);
 
-  // Additional Modals state
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  // Inline delete confirm state for Day Card (nút xóa nằm trong ngày, ko nằm ở bảng)
+  const [cardDeleteConfirmId, setCardDeleteConfirmId] = useState<string | null>(null);
+
+  // Duplicate Modal state
   const [duplicateModalSource, setDuplicateModalSource] = useState<MassEvent | null>(null);
-  const [duplicateNewDate, setDuplicateNewDate] = useState<string>(new Date().toISOString().substring(0, 10));
+  const [duplicateNewDate, setDuplicateNewDate] = useState<string>('');
+  const [duplicateNewTitle, setDuplicateNewTitle] = useState<string>('');
 
   // Edit item expanded row index
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null);
@@ -120,6 +139,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   const handleAutoCreateSunday = () => {
     const autoMass = generateAutoSundayMass(masses);
     setEditingMass(autoMass);
+    setIsConfirmingDeleteInModal(false);
     setExpandedItemIndex(null);
     setSearchDropdowns({});
     setIsEditModalOpen(true);
@@ -133,9 +153,33 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
       const newMass = generateAutoSundayMass(masses);
       setEditingMass(newMass);
     }
+    setIsConfirmingDeleteInModal(false);
     setExpandedItemIndex(null);
     setSearchDropdowns({});
     setIsEditModalOpen(true);
+  };
+
+  // Open Duplicate Modal for a specific Day
+  const handleOpenDuplicate = (m: MassEvent) => {
+    setDuplicateModalSource(m);
+    // Suggest 7 days later
+    try {
+      const d = new Date(m.date);
+      d.setDate(d.getDate() + 7);
+      setDuplicateNewDate(d.toISOString().substring(0, 10));
+    } catch {
+      setDuplicateNewDate(new Date().toISOString().substring(0, 10));
+    }
+    setDuplicateNewTitle(`${m.title || m.name || 'Thánh lễ'} (Bản sao)`);
+  };
+
+  const handleConfirmDuplicate = () => {
+    if (!duplicateModalSource || !duplicateNewDate) return;
+    onDuplicateMass({
+      ...duplicateModalSource,
+      title: duplicateNewTitle || duplicateModalSource.title
+    }, duplicateNewDate);
+    setDuplicateModalSource(null);
   };
 
   // Fill Standard Sunday Template in Modal
@@ -177,7 +221,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
     setExpandedItemIndex(editingMass.program.length);
   };
 
-  // Drag and drop reorder logic
+  // Reorder logic for desktop drag & drop
   const handleDragStart = (idx: number) => {
     setDraggedRowIndex(idx);
   };
@@ -192,6 +236,25 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
     setEditingMass({ ...editingMass, program: updated });
     setDraggedRowIndex(null);
+  };
+
+  // Touch & Mobile-Friendly Row Reorder (Up / Down)
+  const handleMoveRowUp = (idx: number) => {
+    if (!editingMass || idx <= 0) return;
+    const updated = [...editingMass.program];
+    const temp = updated[idx - 1];
+    updated[idx - 1] = updated[idx];
+    updated[idx] = temp;
+    setEditingMass({ ...editingMass, program: updated });
+  };
+
+  const handleMoveRowDown = (idx: number) => {
+    if (!editingMass || idx >= editingMass.program.length - 1) return;
+    const updated = [...editingMass.program];
+    const temp = updated[idx + 1];
+    updated[idx + 1] = updated[idx];
+    updated[idx] = temp;
+    setEditingMass({ ...editingMass, program: updated });
   };
 
   // Delete row in editor
@@ -249,7 +312,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   ];
 
   const monthNames = [
-    { key: 'ALL', label: 'Tất cả tháng' },
+    { key: 'ALL', label: 'Tất cả các tháng' },
     { key: '01', label: 'Tháng 1' },
     { key: '02', label: 'Tháng 2' },
     { key: '03', label: 'Tháng 3' },
@@ -263,6 +326,18 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
     { key: '11', label: 'Tháng 11' },
     { key: '12', label: 'Tháng 12' },
   ];
+
+  // Helper format day of week
+  const formatDayOfWeek = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const days = ['Chúa Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      return days[day] || '';
+    } catch {
+      return '';
+    }
+  };
 
   // Export Matrix to Excel
   const handleExportMatrixExcel = () => {
@@ -287,36 +362,115 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row gap-4 items-stretch h-full min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col lg:flex-row gap-3.5 items-stretch min-h-0 md:h-full md:overflow-hidden">
 
-      {/* MOBILE SIDEBAR TOGGLE BUTTON */}
-      <div className="lg:hidden w-full bg-white p-3 rounded-lg border border-stone-200 shadow-2xs flex items-center justify-between shrink-0">
-        <button
-          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          className="flex items-center gap-2 text-slate-900 font-bold text-xs sm:text-sm bg-stone-100 hover:bg-stone-200 px-3 py-2 rounded-md border border-stone-200"
-        >
-          <Filter className="w-4 h-4 text-indigo-700" />
-          <span>{isMobileSidebarOpen ? 'Ẩn Bộ Lọc Sidebar' : 'Hiện Bộ Lọc & Chức Năng'}</span>
-        </button>
+      {/* TOP RESPONSIVE CONTROL BAR (MOBILE & DESKTOP) */}
+      <div className="lg:hidden w-full bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-2 shrink-0">
+        
+        {/* Toggle Mode: CARDS vs MATRIX */}
+        <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg border border-stone-200">
+          <button
+            onClick={() => setDisplayMode('CARDS')}
+            className={`flex-1 min-h-[38px] flex items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              displayMode === 'CARDS'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/60'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 text-amber-400" />
+            <span>📱 Thẻ Ngày Lễ</span>
+          </button>
 
-        <span className="text-xs font-bold bg-indigo-100 text-indigo-950 px-2.5 py-1 rounded-full">
-          {filteredMasses.length} Ngày lễ
-        </span>
+          <button
+            onClick={() => setDisplayMode('MATRIX')}
+            className={`flex-1 min-h-[38px] flex items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              displayMode === 'MATRIX'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/60'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>📊 Bảng Ma Trận</span>
+          </button>
+        </div>
+
+        {/* Quick Actions Row */}
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            className="flex-1 min-h-[36px] flex items-center justify-center gap-1.5 text-stone-800 font-bold text-xs bg-stone-50 hover:bg-stone-100 px-2.5 py-1.5 rounded-lg border border-stone-200 cursor-pointer"
+          >
+            <Filter className="w-3.5 h-3.5 text-indigo-700" />
+            <span>{isMobileSidebarOpen ? 'Ẩn Bộ Lọc' : 'Bộ Lọc & Tìm'}</span>
+            <span className="text-[10px] bg-indigo-100 text-indigo-900 px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
+              {filteredMasses.length}
+            </span>
+          </button>
+
+          <button
+            onClick={handleAutoCreateSunday}
+            className="flex-1 min-h-[36px] flex items-center justify-center gap-1 text-white font-bold text-xs bg-emerald-700 hover:bg-emerald-800 px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer"
+            title="Tự động tạo Chúa Nhật kế tiếp"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+            <span>+ Tạo Chúa Nhật</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenEditModal(null)}
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-2xs cursor-pointer"
+            title="Thêm lễ mới"
+          >
+            <Plus className="w-4 h-4 text-amber-400" />
+          </button>
+        </div>
       </div>
 
       {/* LEFT SIDEBAR CONTROLS PANEL */}
-      <aside className={`w-full lg:w-72 shrink-0 bg-white border border-stone-200 rounded-xl p-4 shadow-2xs space-y-4 lg:overflow-y-auto lg:max-h-full ${
+      <aside className={`w-full lg:w-72 shrink-0 bg-white border border-stone-200 rounded-xl p-3.5 sm:p-4 shadow-2xs space-y-3.5 lg:overflow-y-auto lg:max-h-full ${
         isMobileSidebarOpen ? 'block' : 'hidden lg:block'
       }`}>
         {/* Sidebar Title */}
-        <div className="flex items-center justify-between pb-3 border-b border-stone-200">
-          <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm sm:text-base">
-            <Filter className="w-4.5 h-4.5 text-indigo-700" />
+        <div className="flex items-center justify-between pb-2.5 border-b border-stone-200">
+          <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm">
+            <Filter className="w-4 h-4 text-indigo-700" />
             <span>Bộ Lọc & Chức Năng</span>
           </div>
           <span className="text-[11px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded-full">
-            {filteredMasses.length} Lễ
+            {filteredMasses.length} Ngày lễ
           </span>
+        </div>
+
+        {/* Display Mode Toggle for Desktop */}
+        <div className="hidden lg:block space-y-1.5">
+          <label className="text-xs font-bold text-stone-700 block">
+            Chế Độ Xem:
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => setDisplayMode('CARDS')}
+              className={`p-2 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                displayMode === 'CARDS'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-stone-50 text-stone-700 hover:bg-stone-100 border border-stone-200'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-amber-400" />
+              <span>Thẻ Ngày Lễ</span>
+            </button>
+
+            <button
+              onClick={() => setDisplayMode('MATRIX')}
+              className={`p-2 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                displayMode === 'MATRIX'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-stone-50 text-stone-700 hover:bg-stone-100 border border-stone-200'
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Ma Trận Excel</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Search */}
@@ -330,72 +484,65 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
               type="text"
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
-              placeholder="Nhập tên bài, tác giả..."
-              className="w-full bg-stone-50 pl-8 pr-2.5 py-1.5 rounded-md border border-stone-200 text-slate-900 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+              placeholder="Tên bài hát, nhạc sĩ, ngày lễ..."
+              className="w-full bg-stone-50 pl-8 pr-2.5 py-2 rounded-md border border-stone-200 text-slate-900 text-xs focus:outline-none focus:border-indigo-500 font-medium"
             />
           </div>
         </div>
 
-        {/* View Mode Mode Switcher */}
+        {/* Filter Selection Modes */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-stone-700 block">
-            Chế Độ Hiển Thị Bảng
+            Lọc Theo Danh Mục:
           </label>
-          <div className="grid grid-cols-1 gap-1">
+          <div className="grid grid-cols-2 gap-1 text-xs">
             <button
-              onClick={() => setViewMode('BANG_EXCEL')}
-              className={`px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${
-                viewMode === 'BANG_EXCEL'
-                  ? 'bg-slate-900 text-white shadow-2xs'
+              onClick={() => setViewMode('ALL')}
+              className={`px-2 py-1.5 rounded-md font-bold transition-all text-center cursor-pointer ${
+                viewMode === 'ALL'
+                  ? 'bg-indigo-700 text-white'
                   : 'bg-stone-50 text-stone-700 hover:bg-stone-100'
               }`}
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span>Bảng Ma Trận Lưới Excel</span>
+              Tất Cả
             </button>
-
             <button
               onClick={() => setViewMode('THEO_MUA')}
-              className={`px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${
+              className={`px-2 py-1.5 rounded-md font-bold transition-all text-center cursor-pointer ${
                 viewMode === 'THEO_MUA'
-                  ? 'bg-slate-900 text-white shadow-2xs'
+                  ? 'bg-indigo-700 text-white'
                   : 'bg-stone-50 text-stone-700 hover:bg-stone-100'
               }`}
             >
-              <Layers className="w-4 h-4 text-amber-400" />
-              <span>Theo Mùa Phụng Vụ</span>
+              Theo Mùa
             </button>
-
             <button
               onClick={() => setViewMode('THEO_THANG')}
-              className={`px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${
+              className={`px-2 py-1.5 rounded-md font-bold transition-all text-center cursor-pointer ${
                 viewMode === 'THEO_THANG'
-                  ? 'bg-slate-900 text-white shadow-2xs'
+                  ? 'bg-indigo-700 text-white'
                   : 'bg-stone-50 text-stone-700 hover:bg-stone-100'
               }`}
             >
-              <Calendar className="w-4 h-4 text-sky-400" />
-              <span>Theo Tháng</span>
+              Theo Tháng
             </button>
-
             <button
               onClick={() => setViewMode('THEO_NAM')}
-              className={`px-3 py-2 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${
+              className={`px-2 py-1.5 rounded-md font-bold transition-all text-center cursor-pointer ${
                 viewMode === 'THEO_NAM'
-                  ? 'bg-slate-900 text-white shadow-2xs'
+                  ? 'bg-indigo-700 text-white'
                   : 'bg-stone-50 text-stone-700 hover:bg-stone-100'
               }`}
             >
-              <BookOpen className="w-4 h-4 text-indigo-400" />
-              <span>Theo Năm</span>
+              Theo Năm
             </button>
           </div>
         </div>
 
-        {/* Dynamic Contextual Sub-Filters */}
+        {/* Contextual Sub-Filters */}
         {viewMode === 'THEO_MUA' && (
           <div className="space-y-1">
-            <label className="text-xs font-bold text-stone-700 block">Lọc Theo Mùa:</label>
+            <label className="text-xs font-bold text-stone-700 block">Chọn Mùa Phụng Vụ:</label>
             <select
               value={selectedSeason}
               onChange={e => setSelectedSeason(e.target.value)}
@@ -410,7 +557,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
         {viewMode === 'THEO_THANG' && (
           <div className="space-y-1">
-            <label className="text-xs font-bold text-stone-700 block">Lọc Theo Tháng:</label>
+            <label className="text-xs font-bold text-stone-700 block">Chọn Tháng:</label>
             <select
               value={selectedMonth}
               onChange={e => setSelectedMonth(e.target.value)}
@@ -425,7 +572,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
         {viewMode === 'THEO_NAM' && (
           <div className="space-y-1">
-            <label className="text-xs font-bold text-stone-700 block">Lọc Theo Năm:</label>
+            <label className="text-xs font-bold text-stone-700 block">Chọn Năm:</label>
             <select
               value={selectedYear}
               onChange={e => setSelectedYear(e.target.value)}
@@ -443,7 +590,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
         <div className="pt-2 border-t border-stone-200 space-y-2">
           <button
             onClick={handleAutoCreateSunday}
-            className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs p-2.5 rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5"
+            className="w-full min-h-[40px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs p-2.5 rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             title="Tự động tính ngày Chúa Nhật kế tiếp và tạo khung bài hát chuẩn"
           >
             <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
@@ -452,7 +599,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
           <button
             onClick={() => handleOpenEditModal(null)}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs p-2.5 rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5"
+            className="w-full min-h-[40px] bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs p-2.5 rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-amber-400" />
             <span>Thêm Chương Trình Lễ Mới</span>
@@ -460,7 +607,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
           <button
             onClick={handleExportMatrixExcel}
-            className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs p-2.5 rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5"
+            className="w-full min-h-[38px] bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs p-2 rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             title="Xuất tập tin Excel"
           >
             <Download className="w-4 h-4 text-emerald-400" />
@@ -470,7 +617,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
         {/* Liturgical Colors Legend */}
         <div className="pt-2 border-t border-stone-200 text-[11px] space-y-1.5 text-stone-600">
-          <div className="font-bold text-slate-900">Màu Phụng Vụ Quy Chuẩn:</div>
+          <div className="font-bold text-slate-900">Màu Phụng Vụ:</div>
           <div className="grid grid-cols-2 gap-1 text-[10px]">
             <span className="flex items-center gap-1 text-emerald-900"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span> Mùa Thường Niên</span>
             <span className="flex items-center gap-1 text-purple-900"><span className="w-2.5 h-2.5 rounded bg-purple-600 inline-block"></span> Mùa Vọng / Chay</span>
@@ -480,62 +627,281 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
         </div>
       </aside>
 
-      {/* RIGHT WORKSPACE AREA (100% WIDTH TABLE MATRIX) */}
-      <main className="flex-1 flex flex-col min-w-0 w-full h-full min-h-0 overflow-hidden space-y-3">
-        <MatrixScheduleView
-          masses={filteredMasses}
-          songs={songs}
-          onSaveMass={onSaveMass}
-          onDeleteMass={onDeleteMass}
-          onOpenEditDetails={(m) => handleOpenEditModal(m)}
-          onOpenNewMass={() => handleOpenEditModal(null)}
-          onOpenPdfPrint={onOpenPdfPrint}
-        />
+      {/* MAIN WORKSPACE CONTENT AREA */}
+      <main className="flex-1 flex flex-col min-w-0 w-full min-h-0 md:h-full md:overflow-hidden">
+        
+        {/* VIEW 1: DAY CARDS VIEW (OPTIMIZED FOR MOBILE PHONES & EASY DAY MANAGEMENT) */}
+        {displayMode === 'CARDS' && (
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5">
+            {/* Header info bar */}
+            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-between gap-2 text-xs font-semibold text-stone-700">
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="w-4 h-4 text-indigo-700" />
+                <span>Hiển thị <strong>{filteredMasses.length}</strong> ngày lễ theo dạng Thẻ</span>
+              </div>
+
+              <button
+                onClick={() => setDisplayMode('MATRIX')}
+                className="text-indigo-900 font-bold hover:underline flex items-center gap-1 text-[11px] cursor-pointer"
+              >
+                <span>Xem dạng bảng lưới</span>
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+              </button>
+            </div>
+
+            {/* List of Day Cards */}
+            {filteredMasses.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                {filteredMasses.map(m => {
+                  const style = getLiturgicalHeaderStyle(m.liturgicalSeason || m.season);
+                  const isApproved = m.status === 'APPROVED' || m.status === 'USED';
+                  const isConfirmingDeleteThisCard = cardDeleteConfirmId === m.id;
+
+                  return (
+                    <div 
+                      key={m.id}
+                      className="bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden flex flex-col hover:border-indigo-300 transition-all"
+                    >
+                      {/* Top Liturgical Color Band Header */}
+                      <div className={`p-3 border-b ${style.headerBg} ${style.headerText} ${style.headerBorder} flex items-start justify-between gap-2`}>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-bold opacity-90">
+                              {formatDayOfWeek(m.date)}
+                            </span>
+                            <span className="text-sm font-extrabold tracking-tight">
+                              {formatDateToDDMMYYYY(m.date)}
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${style.badgeBg} ${style.badgeText} ${style.badgeBorder}`}>
+                              {style.name}
+                            </span>
+                          </div>
+                          <h3 className="font-extrabold text-sm sm:text-base mt-0.5 line-clamp-1">
+                            {m.title || m.name || 'Thánh Lễ'}
+                          </h3>
+                        </div>
+
+                        {/* Status badge */}
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                          isApproved 
+                            ? 'bg-emerald-600 text-white' 
+                            : 'bg-amber-100 text-amber-900 border border-amber-300'
+                        }`}>
+                          {isApproved ? 'Đã Chốt' : 'Bản Nháp'}
+                        </span>
+                      </div>
+
+                      {/* Song Items List for this Day */}
+                      <div className="p-3 flex-1 space-y-2 text-xs divide-y divide-stone-100">
+                        {m.program && m.program.length > 0 ? (
+                          m.program.map((item, idx) => {
+                            const pos = item.position;
+                            const badgeColor = getMassPositionBadgeColor(pos);
+                            const pageStr = item.key || item.pageNumber;
+                            const soloName = item.soloSinger || item.soloist;
+                            const organistName = item.organist || item.instrumentalist || item.accompanist;
+
+                            return (
+                              <div key={item.id || idx} className="pt-2 first:pt-0 space-y-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                                      {item.positionLabel || getMassPositionLabel(pos)}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-slate-900 line-clamp-1">
+                                      {item.title || <span className="text-stone-400 italic font-normal">Chưa chọn bài</span>}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-[11px] text-stone-500 font-medium">
+                                      {item.composer && <span>{item.composer}</span>}
+                                      {pageStr && (
+                                        <span className="bg-amber-100 text-amber-950 px-1 py-0 rounded text-[9px] font-bold">
+                                          Tr. {pageStr}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Solo / Organist info badge */}
+                                {(soloName || organistName) && (
+                                  <div className="flex flex-wrap items-center gap-1.5 pl-6 text-[10px]">
+                                    {soloName && (
+                                      <span className="bg-purple-100 text-purple-950 font-bold px-1.5 py-0.2 rounded border border-purple-200 flex items-center gap-1">
+                                        <Mic className="w-2.5 h-2.5 text-purple-700" />
+                                        <span>Solo: {soloName}</span>
+                                      </span>
+                                    )}
+                                    {organistName && (
+                                      <span className="bg-sky-50 text-sky-950 font-medium px-1.5 py-0.2 rounded border border-sky-200 flex items-center gap-1">
+                                        <Volume2 className="w-2.5 h-2.5 text-sky-700" />
+                                        <span>Đàn: {organistName}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="py-4 text-center text-stone-400 italic text-xs">
+                            Chưa có bài hát nào trong ngày lễ này.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Day Action Buttons (Nút xóa nằm ngay trong ngày lễ, ko nằm ở bảng!) */}
+                      <div className="p-2.5 bg-stone-50 border-t border-stone-200">
+                        {isConfirmingDeleteThisCard ? (
+                          <div className="bg-rose-50 p-2.5 rounded-lg border border-rose-300 space-y-2 animate-in fade-in duration-150">
+                            <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                              <span>Xác nhận xóa ngày lễ {formatDateToDDMMYYYY(m.date)}?</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  onDeleteMass(m.id);
+                                  setCardDeleteConfirmId(null);
+                                }}
+                                className="flex-1 min-h-[34px] bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-md shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Xác Nhận Xóa</span>
+                              </button>
+                              <button
+                                onClick={() => setCardDeleteConfirmId(null)}
+                                className="min-h-[34px] px-3 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold text-xs rounded-md cursor-pointer"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-1.5">
+                            {/* Edit Button */}
+                            <button
+                              onClick={() => handleOpenEditModal(m)}
+                              className="flex-1 min-h-[36px] bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-lg px-2.5 py-1.5 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-all"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-amber-300" />
+                              <span>Sửa Chương Trình</span>
+                            </button>
+
+                            {/* Print / PDF Button */}
+                            <button
+                              onClick={() => onOpenPdfPrint(m)}
+                              className="min-h-[36px] min-w-[36px] bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                              title="Xem & In PDF"
+                            >
+                              <Printer className="w-4 h-4 text-stone-700" />
+                            </button>
+
+                            {/* Duplicate Button */}
+                            <button
+                              onClick={() => handleOpenDuplicate(m)}
+                              className="min-h-[36px] min-w-[36px] bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                              title="Nhân bản sang Chúa Nhật kế"
+                            >
+                              <Copy className="w-4 h-4 text-stone-700" />
+                            </button>
+
+                            {/* NÚT XÓA NẰM TRONG NGÀY (Theo đúng yêu cầu của người dùng) */}
+                            <button
+                              onClick={() => setCardDeleteConfirmId(m.id)}
+                              className="min-h-[36px] min-w-[36px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                              title="Xóa ngày lễ này"
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-600" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl p-8 border border-stone-200 text-center space-y-3">
+                <Calendar className="w-10 h-10 text-stone-300 mx-auto" />
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-800 text-sm">Không tìm thấy ngày lễ nào</h4>
+                  <p className="text-xs text-stone-500">Thử thay đổi từ khóa tìm kiếm hoặc chọn mùa/tháng khác.</p>
+                </div>
+                <button
+                  onClick={handleAutoCreateSunday}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>Tự động tạo Chúa Nhật kế tiếp</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 2: EXCEL MATRIX VIEW (MA TRẬN LƯỚI NGANG) */}
+        {displayMode === 'MATRIX' && (
+          <div className="flex-1 flex flex-col min-w-0 w-full min-h-0 md:h-full md:overflow-hidden">
+            <MatrixScheduleView
+              masses={filteredMasses}
+              songs={songs}
+              onSaveMass={onSaveMass}
+              onDeleteMass={onDeleteMass}
+              onOpenEditDetails={(m) => handleOpenEditModal(m)}
+              onOpenNewMass={() => handleOpenEditModal(null)}
+              onOpenPdfPrint={onOpenPdfPrint}
+            />
+          </div>
+        )}
+
       </main>
 
       {/* POPUP MODAL EDITOR FOR MASS PROGRAM */}
       {isEditModalOpen && editingMass && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-4xl w-full my-auto border border-stone-200 shadow-2xl flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl sm:rounded-2xl max-w-4xl w-full my-auto border border-stone-200 shadow-2xl flex flex-col max-h-[94vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="bg-indigo-700 text-white p-4 font-bold flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
+            <div className="bg-indigo-700 text-white p-3.5 sm:p-4 font-bold flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                  <Edit3 className="w-4.5 h-4.5 text-white" />
+                  <Edit3 className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base sm:text-lg text-white">
+                  <h3 className="font-extrabold text-sm sm:text-base text-white">
                     {editingMass.id.startsWith('m-') ? 'Thêm Chương Trình Thánh Lễ Mới' : 'Chỉnh Sửa Chương Trình Thánh Lễ'}
                   </h3>
-                  <p className="text-xs text-indigo-100 font-medium">
-                    Kéo thả vị trí biểu tượng tay nắm, chọn bài hát hoặc nhập bài hát mới
+                  <p className="text-[11px] text-indigo-100 font-medium hidden sm:block">
+                    Dùng nút ▲ ▼ để sắp xếp thứ tự, chọn bài hát hoặc nhập bài hát mới
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors"
+                className="p-1.5 text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-5 text-xs sm:text-sm">
-              {/* 1. Thông tin chung */}
-              <div className="bg-stone-50 p-4 rounded-lg border border-stone-200 space-y-3">
-                <div className="flex items-center justify-between">
+            <div className="p-3.5 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 text-xs sm:text-sm">
+              {/* 1. General Info */}
+              <div className="bg-stone-50 p-3 sm:p-4 rounded-xl border border-stone-200 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">
                     1. Thông tin lễ
                   </h4>
                   <button
                     type="button"
                     onClick={handleFillStandardSundayTemplate}
-                    className="text-indigo-950 font-extrabold text-xs bg-indigo-100 hover:bg-indigo-200 px-3 py-1 rounded border border-indigo-300 transition-colors flex items-center gap-1 shadow-2xs"
+                    className="text-indigo-950 font-extrabold text-xs bg-indigo-100 hover:bg-indigo-200 px-2.5 py-1 rounded-md border border-indigo-300 transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
                   >
                     <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
-                    <span>⚡ Nạp Mẫu Lễ Chúa Nhật Chuẩn</span>
+                    <span>Nạp Khung Chúa Nhật Chuẩn</span>
                   </button>
                 </div>
 
@@ -585,24 +951,24 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                 </div>
               </div>
 
-              {/* 2. Danh sách bài hát theo vị trí */}
+              {/* 2. Program song items list */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">
-                    2. Danh sách bài hát (Nắm kéo thả tay nắm để xếp lại thứ tự)
+                    2. Danh sách bài hát (Bấm ▲ ▼ để đổi thứ tự trên di động)
                   </h4>
 
                   <button
                     type="button"
                     onClick={handleAddProgramRow}
-                    className="text-indigo-950 font-bold text-xs flex items-center gap-1 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded border border-indigo-200 transition-colors"
+                    className="text-indigo-950 font-bold text-xs flex items-center gap-1 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-md border border-indigo-200 transition-colors cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>+ Thêm vị trí bài hát</span>
                   </button>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {editingMass.program.map((item, idx) => {
                     const isExpanded = expandedItemIndex === idx;
                     const dropdownState = searchDropdowns[idx] || { query: item.title || '', show: false };
@@ -615,21 +981,46 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                         onDragStart={() => handleDragStart(idx)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => handleDrop(idx)}
-                        className={`bg-white p-3 rounded-lg border shadow-2xs space-y-2 transition-all ${
+                        className={`bg-white p-2.5 sm:p-3 rounded-lg border shadow-2xs space-y-2 transition-all ${
                           draggedRowIndex === idx ? 'opacity-40 border-indigo-500 bg-indigo-50/50' : 'border-stone-200 hover:border-indigo-300'
                         }`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          {/* Nắm Thả Thứ Tự (Drag Handle Grip) */}
-                          <div 
-                            className="p-1 cursor-grab active:cursor-grabbing text-stone-400 hover:text-indigo-700 flex items-center justify-center shrink-0"
-                            title="Nắm kéo thả để sắp xếp lại thứ tự"
-                          >
-                            <GripVertical className="w-5 h-5" />
+                          {/* Desktop Drag Handle & Mobile Up/Down Reorder Buttons */}
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {/* Grip handle for desktop */}
+                            <div 
+                              className="hidden sm:flex p-1 cursor-grab active:cursor-grabbing text-stone-400 hover:text-indigo-700 items-center justify-center"
+                              title="Nắm kéo thả để sắp xếp lại thứ tự"
+                            >
+                              <GripVertical className="w-4 h-4" />
+                            </div>
+
+                            {/* Mobile Touch Reorder Buttons */}
+                            <div className="flex items-center bg-stone-100 rounded border border-stone-200">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveRowUp(idx)}
+                                disabled={idx === 0}
+                                className="p-1 text-stone-600 hover:text-indigo-700 disabled:opacity-20 cursor-pointer"
+                                title="Chuyển lên trên"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveRowDown(idx)}
+                                disabled={idx === editingMass.program.length - 1}
+                                className="p-1 text-stone-600 hover:text-indigo-700 disabled:opacity-20 cursor-pointer"
+                                title="Chuyển xuống dưới"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
 
-                          {/* Compact Narrow Position Selector leaving plenty of room for Song Title */}
-                          <div className="w-32 sm:w-36 shrink-0">
+                          {/* Position Selector */}
+                          <div className="w-28 sm:w-36 shrink-0">
                             <select
                               value={item.position}
                               onChange={(e) => {
@@ -655,8 +1046,8 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             </select>
                           </div>
 
-                          {/* Song Title Combined Input */}
-                          <div className="relative flex-1 min-w-[180px]">
+                          {/* Song Title Input with Autocomplete */}
+                          <div className="relative flex-1 min-w-[150px]">
                             <input
                               type="text"
                               value={item.title || ''}
@@ -672,7 +1063,6 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                                 });
                               }}
                               onFocus={() => {
-                                // Only show dropdown if title is empty or if user actively edits
                                 if (!item.title) {
                                   setSearchDropdowns({
                                     ...searchDropdowns,
@@ -708,7 +1098,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                                         [idx]: { query: s.title, show: false }
                                       });
                                     }}
-                                    className="w-full text-left p-2 hover:bg-amber-50 flex items-center justify-between text-xs sm:text-sm"
+                                    className="w-full text-left p-2 hover:bg-amber-50 flex items-center justify-between text-xs sm:text-sm cursor-pointer"
                                   >
                                     <div>
                                       <strong className="text-slate-900 block font-bold">{s.title}</strong>
@@ -723,8 +1113,8 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             )}
                           </div>
 
-                          {/* Composer / Author Input */}
-                          <div className="w-28 sm:w-32">
+                          {/* Composer Input */}
+                          <div className="w-24 sm:w-32">
                             <input
                               type="text"
                               value={item.composer || ''}
@@ -738,8 +1128,8 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             />
                           </div>
 
-                          {/* Page Number / Storage Code Input */}
-                          <div className="w-20 sm:w-24">
+                          {/* Page Number */}
+                          <div className="w-18 sm:w-24">
                             <input
                               type="text"
                               value={item.key || item.pageNumber || ''}
@@ -748,7 +1138,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                                 newItems[idx] = { ...newItems[idx], key: e.target.value, pageNumber: e.target.value };
                                 setEditingMass({ ...editingMass, program: newItems });
                               }}
-                              placeholder="Trang sách..."
+                              placeholder="Trang..."
                               className="w-full bg-stone-50 p-2 rounded-md border border-stone-200 text-xs text-slate-800 font-medium"
                             />
                           </div>
@@ -757,7 +1147,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                           <button
                             type="button"
                             onClick={() => setExpandedItemIndex(isExpanded ? null : idx)}
-                            className={`px-2.5 py-2 rounded text-xs font-semibold border flex items-center gap-1 ${
+                            className={`px-2 py-2 rounded text-xs font-semibold border flex items-center gap-1 cursor-pointer ${
                               isExpanded || item.hasSolo || item.organist || item.rhythm
                                 ? 'bg-amber-100 text-amber-950 border-amber-300 font-bold'
                                 : 'bg-stone-100 text-stone-700 border-stone-200 hover:bg-stone-200'
@@ -772,8 +1162,8 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDeleteRow(idx)}
-                            className="p-2 text-stone-400 hover:text-red-600 rounded transition-colors"
-                            title="Xóa vị trí"
+                            className="p-2 text-stone-400 hover:text-red-600 rounded transition-colors cursor-pointer"
+                            title="Xóa vị trí này"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -781,7 +1171,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
                         {/* Expanded details (Solo, Organist, Rhythm) */}
                         {isExpanded && (
-                          <div className="bg-stone-50 p-3 rounded-md border border-stone-200 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+                          <div className="bg-stone-50 p-3 rounded-md border border-stone-200 grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 text-xs">
                             <div>
                               <label className="font-bold text-stone-700 block mb-1">
                                 🎤 Người hát Solo / Xướng:
@@ -851,56 +1241,150 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="bg-stone-50 p-4 border-t border-stone-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 rounded-md font-semibold text-stone-700 bg-stone-200 hover:bg-stone-300 text-xs sm:text-sm cursor-pointer"
-                >
-                  Hủy
-                </button>
-
-                {!editingMass.id.startsWith('m-') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`Bạn có chắc chắn muốn XÓA hoàn toàn chương trình lễ ngày ${formatDateToDDMMYYYY(editingMass.date)} không?`)) {
+            {/* Modal Footer with Safe Inline Delete Confirmation */}
+            <div className="bg-stone-50 p-3 sm:p-4 border-t border-stone-200 shrink-0">
+              {isConfirmingDeleteInModal ? (
+                <div className="bg-rose-50 p-3 rounded-xl border border-rose-300 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 text-rose-900 font-bold text-xs sm:text-sm">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Bạn có chắc chắn muốn XÓA VĨNH VIỄN chương trình ngày {formatDateToDDMMYYYY(editingMass.date)}?</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
                         onDeleteMass(editingMass.id);
+                        setIsConfirmingDeleteInModal(false);
                         setIsEditModalOpen(false);
-                      }
-                    }}
-                    className="px-3.5 py-2 rounded-md font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4 text-rose-600" />
-                    <span>Xóa Lễ Này</span>
-                  </button>
-                )}
-              </div>
+                      }}
+                      className="min-h-[36px] px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-2xs cursor-pointer"
+                    >
+                      Xác Nhận Xóa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingDeleteInModal(false)}
+                      className="min-h-[36px] px-3 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold text-xs rounded-lg cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(false)}
+                      className="min-h-[38px] px-3.5 py-2 rounded-lg font-semibold text-stone-700 bg-stone-200 hover:bg-stone-300 text-xs sm:text-sm cursor-pointer"
+                    >
+                      Đóng
+                    </button>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSaveEditor('DRAFT')}
-                  className="px-4 py-2 rounded-md font-bold text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-xs sm:text-sm cursor-pointer"
-                >
-                  Lưu Bản Nháp
-                </button>
+                    {!editingMass.id.startsWith('m-') && (
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingDeleteInModal(true)}
+                        className="min-h-[38px] px-3 py-2 rounded-lg font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-600" />
+                        <span>Xóa Lễ Này</span>
+                      </button>
+                    )}
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleSaveEditor('APPROVED')}
-                  className="px-5 py-2 rounded-md font-extrabold text-slate-950 bg-amber-500 hover:bg-amber-400 shadow-2xs text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Chốt Lễ Này</span>
-                </button>
-              </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditor('DRAFT')}
+                      className="min-h-[38px] px-3.5 py-2 rounded-lg font-bold text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-xs sm:text-sm cursor-pointer"
+                    >
+                      Lưu Bản Nháp
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditor('APPROVED')}
+                      className="min-h-[38px] px-4.5 py-2 rounded-lg font-extrabold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-2xs text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Chốt Lễ Này</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {/* POPUP MODAL DUPLICATE MASS */}
+      {duplicateModalSource && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-stone-200 shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+              <div className="flex items-center gap-2">
+                <Copy className="w-5 h-5 text-indigo-700" />
+                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                  Sao Chép Chương Trình Lễ
+                </h3>
+              </div>
+              <button
+                onClick={() => setDuplicateModalSource(null)}
+                className="p-1 hover:bg-stone-100 rounded-lg text-stone-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-600">
+              Sao chép toàn bộ danh mục bài hát từ lễ ngày <strong>{formatDateToDDMMYYYY(duplicateModalSource.date)}</strong> sang một ngày lễ mới:
+            </p>
+
+            <div className="space-y-3 text-xs sm:text-sm">
+              <div>
+                <label className="font-bold text-stone-800 block mb-1">Tên Thánh Lễ Mới:</label>
+                <input
+                  type="text"
+                  value={duplicateNewTitle}
+                  onChange={e => setDuplicateNewTitle(e.target.value)}
+                  className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-stone-800 block mb-1">Ngày diễn ra mới:</label>
+                <input
+                  type="date"
+                  value={duplicateNewDate}
+                  onChange={e => setDuplicateNewDate(e.target.value)}
+                  className="w-full p-2.5 bg-stone-50 border border-stone-300 rounded-lg font-bold text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-200">
+              <button
+                type="button"
+                onClick={() => setDuplicateModalSource(null)}
+                className="px-3.5 py-2 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold text-xs cursor-pointer"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDuplicate}
+                className="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Sao Chép Ngay</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

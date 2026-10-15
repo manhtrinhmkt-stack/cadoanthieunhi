@@ -64,12 +64,9 @@ export const SettingsBackupModule: React.FC<SettingsBackupModuleProps> = ({
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.data && parsed.data.songs && parsed.data.masses) {
           onRestoreData(parsed.data);
-          alert('Khôi phục dữ liệu từ file JSON thành công!');
-        } else {
-          alert('File JSON không đúng cấu trúc sao lưu Cantus.');
         }
       } catch (err) {
-        alert('Lỗi đọc file JSON sao lưu.');
+        console.error('Lỗi đọc file JSON sao lưu', err);
       }
     };
     reader.readAsText(file);
@@ -107,9 +104,8 @@ export const SettingsBackupModule: React.FC<SettingsBackupModuleProps> = ({
       }));
 
       onImportSongsFromExcel(mappedSongs);
-      alert(`Đã nhập thành công ${mappedSongs.length} bài hát từ Excel!`);
     } catch (err) {
-      alert('Lỗi khi đọc file Excel.');
+      console.error('Lỗi khi đọc file Excel', err);
     }
   };
 

@@ -175,7 +175,7 @@ export default function App() {
   // Search & Print Modals
   const [pdfPrintMass, setPdfPrintMass] = useState<MassEvent | null>(null);
 
-  // SAVE MASS PROGRAM (with Combined Song Creation Logic!)
+  // SAVE MASS PROGRAM
   const handleSaveMass = (updatedMass: MassEvent, newSongsToCreate?: Song[]) => {
     if (newSongsToCreate && newSongsToCreate.length > 0) {
       setSongs(prev => {
@@ -264,12 +264,12 @@ export default function App() {
     }
   };
 
-  // 1. SHOW LOADING SCREEN WHILE VERIFYING 30-DAY SESSION
+  // 1. SHOW LOADING SCREEN WHILE VERIFYING SESSION
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen bg-stone-100 flex flex-col items-center justify-center p-4 antialiased">
         <div className="bg-white p-8 rounded-3xl border border-stone-200 shadow-lg text-center space-y-4 max-w-sm w-full">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-900 text-amber-300 shadow-md ring-4 ring-amber-400/20">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-900 text-amber-300 shadow-md ring-4 ring-amber-400/20 mx-auto">
             <Cross className="w-7 h-7" />
           </div>
           <div className="space-y-1">
@@ -284,7 +284,7 @@ export default function App() {
     );
   }
 
-  // 2. UNAUTHENTICATED USERS ARE BLOCKED AND SHOWN ONLY LOGIN SCREEN
+  // 2. UNAUTHENTICATED USERS ARE SHOWN LOGIN SCREEN
   if (!currentUser) {
     return (
       <LoginView
@@ -300,31 +300,31 @@ export default function App() {
   const confirmedMassesCount = masses.filter(m => m.status === 'APPROVED' || m.status === 'USED').length;
 
   return (
-    <div className="min-h-screen md:h-screen flex flex-col bg-stone-100/70 text-slate-900 font-sans antialiased selection:bg-amber-300 selection:text-slate-900 pb-20 md:pb-2 md:overflow-hidden">
+    <div className="min-h-screen md:h-screen flex flex-col bg-stone-100/80 text-slate-900 font-sans antialiased selection:bg-amber-300 selection:text-slate-900 pb-28 md:pb-2 md:overflow-hidden">
       
-      {/* Compact Light Sacred Top Banner & Header Navigation */}
-      <header className="shrink-0 bg-white border-b border-stone-200 shadow-xs z-40">
+      {/* Compact Responsive Sacred Top Header Navigation */}
+      <header className="shrink-0 bg-white border-b border-stone-200 shadow-2xs z-40 sticky top-0 md:static">
         {/* Top Gold Accent Line */}
         <div className="h-1 w-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600" />
         
-        <div className="max-w-[1650px] mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex items-center justify-between gap-3">
+        <div className="max-w-[1650px] mx-auto px-3 sm:px-6 lg:px-8 py-2">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
             
             {/* Logo & Brand Title */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-800 to-indigo-950 text-amber-300 font-extrabold flex items-center justify-center text-lg shadow-xs shrink-0 border border-indigo-700/50">
-                <Cross className="w-5 h-5 stroke-[2.5]" />
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-indigo-800 to-indigo-950 text-amber-300 font-extrabold flex items-center justify-center text-base sm:text-lg shadow-2xs shrink-0 border border-indigo-700/50">
+                <Cross className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="font-black text-xl tracking-tight text-slate-900 flex items-center gap-1.5">
-                    <span>CANTUS</span>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <h1 className="font-black text-lg sm:text-xl tracking-tight text-slate-900">
+                    CANTUS
                   </h1>
-                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-[9px] sm:text-[10px] font-bold bg-indigo-50 text-indigo-900 border border-indigo-200 px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
                     Sổ Tay Thánh Ca
                   </span>
                 </div>
-                <p className="text-[11px] text-stone-500 font-medium hidden sm:block">
+                <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium hidden sm:block">
                   Chương trình Thánh lễ &amp; Tra cứu Lịch hát
                 </p>
               </div>
@@ -334,9 +334,9 @@ export default function App() {
             <div className="hidden md:flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs sm:text-sm font-semibold">
               <button
                 onClick={() => setActiveTab('MASSES')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'MASSES' 
-                    ? 'bg-indigo-700 text-white shadow-xs' 
+                    ? 'bg-indigo-700 text-white shadow-2xs' 
                     : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
                 }`}
               >
@@ -346,9 +346,9 @@ export default function App() {
 
               <button
                 onClick={() => setActiveTab('SONGS')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'SONGS' 
-                    ? 'bg-indigo-700 text-white shadow-xs' 
+                    ? 'bg-indigo-700 text-white shadow-2xs' 
                     : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
                 }`}
               >
@@ -363,9 +363,9 @@ export default function App() {
 
               <button
                 onClick={() => setActiveTab('SHEETS')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'SHEETS' 
-                    ? 'bg-indigo-700 text-white shadow-xs' 
+                    ? 'bg-indigo-700 text-white shadow-2xs' 
                     : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
                 }`}
               >
@@ -380,9 +380,9 @@ export default function App() {
 
               <button
                 onClick={() => setActiveTab('SETTINGS')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                   activeTab === 'SETTINGS' 
-                    ? 'bg-indigo-700 text-white shadow-xs' 
+                    ? 'bg-indigo-700 text-white shadow-2xs' 
                     : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
                 }`}
                 title="Cài đặt & Sao lưu dữ liệu"
@@ -391,21 +391,15 @@ export default function App() {
               </button>
             </div>
 
-            {/* Liturgical Season Tag & Logged User Badge */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-900 hidden lg:flex">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Mùa: <strong>Thường Niên</strong></span>
-              </div>
-
-              {/* Logged-in User Profile Pill */}
-              <div className="flex items-center gap-2 bg-stone-100 border border-stone-200 px-2.5 py-1 rounded-xl text-xs font-bold text-stone-800">
-                <User className="w-3.5 h-3.5 text-indigo-700" />
-                <span className="max-w-[100px] sm:max-w-[140px] truncate">{currentUser.displayName || currentUser.username}</span>
+            {/* Logged User Badge & Controls */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-stone-100 border border-stone-200 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold text-stone-800">
+                <User className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+                <span className="max-w-[80px] sm:max-w-[140px] truncate">{currentUser.displayName || currentUser.username}</span>
                 <button
                   onClick={handleLogout}
                   title="Đăng xuất"
-                  className="p-1 text-stone-400 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                  className="p-1 text-stone-400 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
@@ -416,28 +410,28 @@ export default function App() {
         </div>
       </header>
 
-      {/* Compact Quick Stats Bar */}
-      <div className="shrink-0 bg-stone-50 border-b border-stone-200/80 py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-stone-600">
-        <div className="max-w-[1650px] mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center flex-wrap gap-4">
+      {/* Compact Mobile-Friendly Quick Stats Bar */}
+      <div className="shrink-0 bg-stone-50/90 border-b border-stone-200/80 py-1.5 px-3 sm:px-6 lg:px-8 text-[11px] sm:text-xs font-semibold text-stone-600 overflow-x-auto whitespace-nowrap">
+        <div className="max-w-[1650px] mx-auto flex items-center justify-between gap-3 min-w-max sm:min-w-0">
+          <div className="flex items-center gap-3">
             <span>Thánh lễ: <strong className="text-slate-900">{masses.length}</strong></span>
             <span className="text-stone-300">•</span>
             <span>Đã chốt: <strong className="text-emerald-700">{confirmedMassesCount}</strong></span>
-            <span className="text-stone-300 hidden sm:inline">•</span>
-            <span className="hidden sm:inline">Bài hát: <strong className="text-slate-900">{songs.length}</strong></span>
-            <span className="text-stone-300 hidden sm:inline">•</span>
-            <span className="hidden sm:inline">Bản in: <strong className="text-slate-900">{sheets.length}</strong></span>
+            <span className="text-stone-300">•</span>
+            <span>Bài hát: <strong className="text-slate-900">{songs.length}</strong></span>
+            <span className="text-stone-300">•</span>
+            <span>Bản in: <strong className="text-slate-900">{sheets.length}</strong></span>
           </div>
 
-          <div className="text-stone-500 font-medium text-[11px] flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Đã bảo vệ phiên đăng nhập (30 ngày) &amp; Đồng bộ Firestore</span>
+          <div className="text-stone-500 font-medium text-[10px] sm:text-[11px] flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span>Phiên 30 ngày &amp; Đồng bộ Cloud</span>
           </div>
         </div>
       </div>
 
       {/* Main Workspace Area */}
-      <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col min-h-0 md:overflow-hidden">
+      <main className="flex-1 w-full max-w-[1680px] mx-auto px-2.5 sm:px-6 lg:px-8 py-2.5 sm:py-4 flex flex-col min-h-0 md:overflow-hidden">
         
         {/* TAB 1: Chương trình Thánh lễ */}
         {activeTab === 'MASSES' && (
@@ -486,14 +480,14 @@ export default function App() {
 
       </main>
 
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-800 z-50 px-2 py-2 shadow-2xl">
-        <div className="flex items-center justify-around text-[11px] font-bold">
+      {/* Touch-Friendly Mobile Bottom Navigation Bar (Natural Thumb Zone) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 z-50 px-2 pt-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] shadow-2xl">
+        <div className="flex items-center justify-around text-[10px] font-bold">
           
           <button
             onClick={() => setActiveTab('MASSES')}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-lg transition-all ${
-              activeTab === 'MASSES' ? 'text-amber-400 bg-slate-900' : 'text-stone-400 hover:text-stone-200'
+            className={`min-h-[44px] flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'MASSES' ? 'text-amber-300 bg-slate-900/90 shadow-2xs font-extrabold' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Calendar className="w-5 h-5 stroke-[2.2]" />
@@ -502,8 +496,8 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('SONGS')}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-lg transition-all ${
-              activeTab === 'SONGS' ? 'text-amber-400 bg-slate-900' : 'text-stone-400 hover:text-stone-200'
+            className={`min-h-[44px] flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'SONGS' ? 'text-amber-300 bg-slate-900/90 shadow-2xs font-extrabold' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Music className="w-5 h-5 stroke-[2.2]" />
@@ -512,8 +506,8 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('SHEETS')}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-lg transition-all ${
-              activeTab === 'SHEETS' ? 'text-amber-400 bg-slate-900' : 'text-stone-400 hover:text-stone-200'
+            className={`min-h-[44px] flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'SHEETS' ? 'text-amber-300 bg-slate-900/90 shadow-2xs font-extrabold' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <FolderArchive className="w-5 h-5 stroke-[2.2]" />
@@ -522,8 +516,8 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('SETTINGS')}
-            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-lg transition-all ${
-              activeTab === 'SETTINGS' ? 'text-amber-400 bg-slate-900' : 'text-stone-400 hover:text-stone-200'
+            className={`min-h-[44px] flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'SETTINGS' ? 'text-amber-300 bg-slate-900/90 shadow-2xs font-extrabold' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
             <Settings className="w-5 h-5 stroke-[2.2]" />

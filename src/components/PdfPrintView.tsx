@@ -13,27 +13,27 @@ export const PdfPrintView: React.FC<PdfPrintViewProps> = ({ mass, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl border border-stone-200 space-y-6 max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-6 md:p-8 shadow-2xl border border-stone-200 space-y-4 sm:space-y-6 max-h-[92vh] overflow-y-auto">
         <div className="flex justify-between items-center no-print border-b border-stone-100 pb-3">
           <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Xem trước bản in A4</span>
           <div className="flex items-center gap-2">
-            <button onClick={handlePrint} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-xs">
+            <button onClick={handlePrint} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl shadow-xs cursor-pointer">
               In A4 / Xuất PDF
             </button>
-            <button onClick={onClose} className="bg-stone-100 hover:bg-stone-200 text-slate-800 font-bold text-xs px-3.5 py-2 rounded-xl">
+            <button onClick={onClose} className="bg-stone-100 hover:bg-stone-200 text-slate-800 font-bold text-xs px-3.5 py-2 rounded-xl cursor-pointer">
               Đóng
             </button>
           </div>
         </div>
 
         {/* A4 Printable Sheet Content */}
-        <div className="space-y-6 p-4 border border-stone-200 rounded-2xl bg-white text-slate-900 font-serif">
+        <div className="space-y-5 p-3.5 sm:p-6 border border-stone-200 rounded-2xl bg-white text-slate-900 font-serif">
           {/* Sheet Header */}
           <div className="text-center space-y-1 pb-4 border-b-2 border-slate-900">
-            <p className="text-xs tracking-widest uppercase font-sans text-stone-500 font-bold">CHƯƠNG TRÌNH THÁNH CA PHỤNG VỤ</p>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">{mass.title || mass.name}</h1>
-            <p className="text-sm italic font-medium text-stone-700">
+            <p className="text-[10px] sm:text-xs tracking-widest uppercase font-sans text-stone-500 font-bold">CHƯƠNG TRÌNH THÁNH CA PHỤNG VỤ</p>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">{mass.title || mass.name}</h1>
+            <p className="text-xs sm:text-sm italic font-medium text-stone-700">
               Ngày cử hành: <strong>{mass.date}</strong> · {getLiturgicalSeasonLabel(mass.liturgicalSeason || mass.season || 'THUONG_NIEN')}
             </p>
             {(mass.accompanist || mass.conductor) && (

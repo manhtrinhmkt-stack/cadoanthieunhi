@@ -33,6 +33,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
   const [previewBackupData, setPreviewBackupData] = useState<{ masses: MassEvent[]; songs: Song[]; sheets: SheetArchive[] } | null>(null);
   const [restoreMode, setRestoreMode] = useState<'MERGE' | 'REPLACE'>('MERGE');
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
 
   // Export entire dataset to JSON
   const handleExportJson = () => {
@@ -56,6 +58,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
     a.download = `cantus_so_tay_thanh_ca_backup_${new Date().toISOString().substring(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setStatusMessage({ type: 'success', text: 'Đã xuất file sao lưu JSON thành công!' });
   };
 
   // Upload JSON backup file
@@ -69,11 +72,12 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
         const json = JSON.parse(evt.target?.result as string);
         if (json.data && json.data.masses && json.data.songs) {
           setPreviewBackupData(json.data);
+          setStatusMessage(null);
         } else {
-          alert('File JSON không đúng cấu trúc sao lưu của Cantus!');
+          setStatusMessage({ type: 'error', text: 'File JSON không đúng cấu trúc sao lưu của Cantus!' });
         }
       } catch (err) {
-        alert('Lỗi định dạng file JSON!');
+        setStatusMessage({ type: 'error', text: 'Lỗi định dạng file JSON! Vui lòng chọn đúng tệp sao lưu .json.' });
       }
     };
     reader.readAsText(file);
@@ -82,18 +86,40 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   const handleConfirmRestore = () => {
     if (!previewBackupData) return;
     if (restoreMode === 'REPLACE') {
-      if (!window.confirm('CẢNH BÁO: Chế độ THAY THẾ sẽ đè hoàn toàn dữ liệu hiện tại bằng dữ liệu sao lưu! Bạn có muốn tiếp tục?')) {
-        return;
-      }
+      setShowReplaceConfirm(true);
+      return;
     }
 
+    executeRestore();
+  };
+
+  const executeRestore = () => {
+    if (!previewBackupData) return;
     onRestoreData(previewBackupData, restoreMode);
     setPreviewBackupData(null);
-    alert('Khôi phục dữ liệu thành công!');
+    setShowReplaceConfirm(false);
+    setStatusMessage({ type: 'success', text: 'Khôi phục dữ liệu thành công!' });
   };
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
+      {/* Status Notification Banner */}
+      {statusMessage && (
+        <div className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-semibold flex items-center justify-between gap-2 animate-in fade-in duration-150 ${
+          statusMessage.type === 'success' 
+            ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+            : 'bg-rose-50 text-rose-900 border-rose-200'
+        }`}>
+          <span>{statusMessage.text}</span>
+          <button 
+            onClick={() => setStatusMessage(null)}
+            className="p-1 hover:bg-black/5 rounded cursor-pointer"
+          >
+            <Check className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white rounded-3xl p-5 border border-stone-200/80 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -119,7 +145,6 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
           <button
             onClick={() => {
               if (onLogout) onLogout();
-              else alert('Đã đăng xuất khỏi tài khoản cá nhân.');
             }}
             className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
           >
@@ -224,12 +249,46 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
             </div>
 
             <div className="flex gap-2 pt-2">
-              <button onClick={() => setPreviewBackupData(null)} className="flex-1 bg-white font-bold py-2 rounded-xl border border-amber-200">Hủy</button>
-              <button onClick={handleConfirmRestore} className="flex-1 bg-amber-500 text-slate-950 font-black py-2 rounded-xl shadow-xs">Xác nhận khôi phục</button>
+              <button onClick={() => setPreviewBackupData(null)} className="flex-1 bg-white font-bold py-2 rounded-xl border border-amber-200 cursor-pointer">Hủy</button>
+              <button onClick={handleConfirmRestore} className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2 rounded-xl shadow-xs cursor-pointer">Xác nhận khôi phục</button>
             </div>
           </div>
         )}
       </div>
+
+      {/* REPLACE CONFIRMATION MODAL */}
+      {showReplaceConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-3.5 border border-stone-200 shadow-2xl text-xs sm:text-sm animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-2 text-rose-700 font-bold text-base">
+              <AlertTriangle className="w-5 h-5 text-rose-600" />
+              <span>Cảnh Báo Thay Thế Dữ Liệu</span>
+            </div>
+            <p className="text-stone-700 font-medium">
+              Chế độ <strong>THAY THẾ</strong> sẽ xóa đè hoàn toàn toàn bộ dữ liệu Thánh lễ, bài hát và kho bản in hiện tại bằng nội dung từ tệp sao lưu.
+            </p>
+            <p className="text-rose-700 font-bold text-xs">
+              Thao tác này không thể hoàn tác. Bạn có chắc chắn muốn tiếp tục?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-200">
+              <button
+                type="button"
+                onClick={() => setShowReplaceConfirm(false)}
+                className="px-3.5 py-2 rounded-xl border border-stone-300 text-stone-700 font-semibold hover:bg-stone-50 cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={executeRestore}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs cursor-pointer"
+              >
+                Đồng Ý Thay Thế
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -63,7 +63,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-stone-100/90 flex flex-col justify-center items-center p-4 antialiased font-sans selection:bg-indigo-200 selection:text-indigo-900">
       
       {/* Decorative Sacred Header Card */}
-      <div className="w-full max-w-md bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden p-8 sm:p-10 space-y-8 relative">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden p-6 sm:p-10 space-y-6 sm:space-y-8 relative">
         
         {/* Subtle Background Accent Pattern */}
         <div className="absolute -top-12 -right-12 w-36 h-36 bg-indigo-50 rounded-full blur-2xl pointer-events-none" />

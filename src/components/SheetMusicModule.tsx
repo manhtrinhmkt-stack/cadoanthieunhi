@@ -86,7 +86,6 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
     if (!songInputQuery.trim() || !storageCodeInput.trim()) return;
 
     if (codeWarning) {
-      alert('Vui lòng nhập mã lưu trữ khác để tránh bị trùng đè!');
       return;
     }
 
@@ -166,8 +165,76 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
         </div>
       </div>
 
-      {/* Sheets Table */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
+      {/* Mobile Card List View (Phones & Tablets) */}
+      <div className="md:hidden space-y-2.5">
+        {filteredSheets.map(s => (
+          <div key={s.id} className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-0.5 flex-1 min-w-0">
+                <span className="bg-indigo-50 text-indigo-950 px-2 py-0.5 rounded-md border border-indigo-200 font-mono font-bold text-xs inline-block">
+                  {s.storageCode}
+                </span>
+                <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{s.songTitle}</h4>
+                <p className="text-xs text-stone-500 font-normal">{s.composer}</p>
+              </div>
+
+              <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-xs shrink-0">
+                {s.quantity || s.currentQty} bản
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-stone-600 pt-1 border-t border-stone-100">
+              <div>Vị trí: <strong className="text-slate-900">{s.location}</strong></div>
+              <div className="text-right">Ngày in: <strong>{formatDateToDDMMYYYY(s.printDate)}</strong></div>
+            </div>
+
+            {s.note && (
+              <p className="text-[11px] text-stone-500 italic bg-stone-50 p-1.5 rounded">
+                Ghi chú: {s.note}
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-stone-100">
+              <button
+                onClick={() => {
+                  setEditingSheet(s);
+                  setSongInputQuery(s.songTitle);
+                  setSelectedSongId(s.songId || null);
+                  setComposerInput(s.composer);
+                  setStorageCodeInput(s.storageCode);
+                  setPrintDateInput(s.printDate || new Date().toISOString().substring(0, 10));
+                  setQuantityInput(s.quantity || 30);
+                  setLocationInput(s.location);
+                  setNoteInput(s.note || '');
+                  setCodeWarning('');
+                  setShowAddModal(true);
+                }}
+                className="min-h-[34px] px-3 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-indigo-700" />
+                <span>Sửa</span>
+              </button>
+
+              <button
+                onClick={() => setDeleteConfirmSheet(s)}
+                className="min-h-[34px] px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Xóa</span>
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {filteredSheets.length === 0 && (
+          <div className="bg-white rounded-xl p-8 border border-stone-200 text-center text-stone-400 italic text-xs">
+            Không tìm thấy bản in nào phù hợp.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Sheets Table */}
+      <div className="hidden md:block bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm text-slate-700 border-collapse">
             <thead className="bg-stone-50/90 font-bold text-slate-900 border-b border-stone-200">
@@ -213,7 +280,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
                           setCodeWarning('');
                           setShowAddModal(true);
                         }}
-                        className="p-1.5 text-amber-800 hover:bg-amber-100 rounded"
+                        className="p-1.5 text-amber-800 hover:bg-amber-100 rounded cursor-pointer"
                         title="Sửa"
                       >
                         <Edit3 className="w-4 h-4" />
@@ -221,7 +288,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
 
                       <button
                         onClick={() => setDeleteConfirmSheet(s)}
-                        className="p-1.5 text-stone-400 hover:text-rose-600 rounded"
+                        className="p-1.5 text-stone-400 hover:text-rose-600 rounded cursor-pointer"
                         title="Xóa"
                       >
                         <Trash2 className="w-4 h-4" />

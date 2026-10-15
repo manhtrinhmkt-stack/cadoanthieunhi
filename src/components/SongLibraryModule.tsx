@@ -195,8 +195,88 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
         </div>
       </div>
 
-      {/* Song List Table View (Matching Sheet Music Table Format) */}
-      <div className="bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
+      {/* Mobile Card List View (Phones & Tablets) */}
+      <div className="md:hidden space-y-2.5">
+        {filteredSongs.map(s => {
+          const { actualCount, recentDate } = getSongUsageStats(s.title);
+          const pos = s.defaultPosition || s.categories?.[0] || 'HL';
+
+          return (
+            <div key={s.id} className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${getMassPositionBadgeColor(pos)}`}>
+                      {getMassPositionLabel(pos)}
+                    </span>
+                    {(s.storageCode || s.pageNumber) && (
+                      <span className="text-[10px] bg-indigo-50 text-indigo-900 border border-indigo-200 font-mono font-bold px-1.5 py-0.2 rounded">
+                        Tr. {s.storageCode || s.pageNumber}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{s.title}</h4>
+                  <p className="text-xs text-stone-500 font-medium">{s.composer}</p>
+                </div>
+
+                <span className="font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px] shrink-0">
+                  {actualCount} lần
+                </span>
+              </div>
+
+              {/* Stats & Notes */}
+              <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1 border-t border-stone-100">
+                <span>Gần nhất: <strong className="text-stone-700">{recentDate}</strong></span>
+                {s.note && <span className="italic text-stone-400 truncate max-w-[140px]">{s.note}</span>}
+              </div>
+
+              {/* Action Buttons for Mobile */}
+              <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-stone-100">
+                <button
+                  onClick={() => setSelectedSongDetail(s)}
+                  className="min-h-[34px] px-2.5 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
+                >
+                  <History className="w-3.5 h-3.5 text-indigo-700" />
+                  <span>Lịch sử ({actualCount})</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditingSong(s);
+                    setNewTitle(s.title);
+                    setNewComposer(s.composer);
+                    setNewCategory(s.defaultPosition || 'HL');
+                    setNewRhythm(s.rhythm || 'Ballad');
+                    setNewNote(s.note || '');
+                    setShowAddModal(true);
+                  }}
+                  className="min-h-[34px] min-w-[34px] bg-stone-100 hover:bg-stone-200 text-indigo-700 rounded-md flex items-center justify-center cursor-pointer"
+                  title="Sửa bài hát"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={() => setDeleteConfirmSong(s)}
+                  className="min-h-[34px] min-w-[34px] bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-md flex items-center justify-center cursor-pointer"
+                  title="Xóa bài hát"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {filteredSongs.length === 0 && (
+          <div className="bg-white rounded-xl p-8 border border-stone-200 text-center text-stone-400 italic text-xs">
+            Không tìm thấy bài hát nào phù hợp với bộ lọc.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Song List Table View */}
+      <div className="hidden md:block bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm text-slate-700 border-collapse">
             <thead className="bg-stone-50/90 font-bold text-slate-900 border-b border-stone-200">
@@ -256,7 +336,7 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setSelectedSongDetail(s)}
-                          className="px-2 py-1 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded flex items-center gap-1 transition-colors"
+                          className="px-2 py-1 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded flex items-center gap-1 transition-colors cursor-pointer"
                           title="Chi tiết & Lịch sử"
                         >
                           <History className="w-3.5 h-3.5 text-indigo-700" />
@@ -273,7 +353,7 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
                             setNewNote(s.note || '');
                             setShowAddModal(true);
                           }}
-                          className="p-1.5 text-stone-600 hover:text-slate-900 hover:bg-stone-100 rounded"
+                          className="p-1.5 text-stone-600 hover:text-slate-900 hover:bg-stone-100 rounded cursor-pointer"
                           title="Sửa"
                         >
                           <Edit3 className="w-4 h-4 text-indigo-700" />
@@ -281,7 +361,7 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
 
                         <button
                           onClick={() => setDeleteConfirmSong(s)}
-                          className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                          className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
                           title="Xóa"
                         >
                           <Trash2 className="w-4 h-4" />
