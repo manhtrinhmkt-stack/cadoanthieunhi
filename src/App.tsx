@@ -32,6 +32,7 @@ import {
   logoutUser, 
   loadAppDataFromFirestore, 
   saveAppDataToFirestore, 
+  subscribeToAppData,
   emailToUsername 
 } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -70,7 +71,6 @@ export default function App() {
           username,
           displayName: username === 'admin' ? 'Ban Quản Trị' : (firebaseUser.displayName || username)
         });
-        await loadAppData();
       } else {
         setCurrentUser(null);
         isDataLoadedRef.current = false;
@@ -81,46 +81,55 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Cloud Firestore Data upon Successful Login
-  const loadAppData = async () => {
-    try {
-      const data = await loadAppDataFromFirestore();
-      if (data) {
-        if (data.masses && data.masses.length > 0) {
-          setMasses(data.masses);
-        }
-        if (data.songs && data.songs.length > 0) {
-          setSongs(data.songs);
-        }
-        if (data.sheets && data.sheets.length > 0) {
-          setSheets(data.sheets);
-        }
+  // Real-Time Cloud Firestore Sync (Multi-Device Live Sync)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Listen to real-time changes across devices
+    const unsubscribe = subscribeToAppData(
+      (data) => {
+        setMasses(data.masses);
+        setSongs(data.songs);
+        setSheets(data.sheets);
+        localStorage.setItem('cantus_so_tay_masses', JSON.stringify(data.masses));
+        localStorage.setItem('cantus_so_tay_songs', JSON.stringify(data.songs));
+        localStorage.setItem('cantus_so_tay_sheets', JSON.stringify(data.sheets));
+        isDataLoadedRef.current = true;
+      },
+      (err) => {
+        console.warn('[Firestore] Sync warning:', err);
       }
-    } catch (err) {
-      console.error('[Data] Load Firestore app data error:', err);
-    } finally {
-      isDataLoadedRef.current = true;
+    );
+
+    // Initial check: if database has never been initialized, seed it once
+    loadAppDataFromFirestore()
+      .then(async (existingData) => {
+        if (!existingData) {
+          await saveAppDataToFirestore({ masses, songs, sheets });
+        }
+      })
+      .catch((e) => console.warn('[Firestore] Initial check warning:', e));
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Immediate Commit Helper to State & Cloud Firestore (Zero delay, No cancel on reload)
+  const commitAppData = async (newMasses: MassEvent[], newSongs: Song[], newSheets: SheetArchive[]) => {
+    setMasses(newMasses);
+    setSongs(newSongs);
+    setSheets(newSheets);
+    localStorage.setItem('cantus_so_tay_masses', JSON.stringify(newMasses));
+    localStorage.setItem('cantus_so_tay_songs', JSON.stringify(newSongs));
+    localStorage.setItem('cantus_so_tay_sheets', JSON.stringify(newSheets));
+
+    if (currentUser) {
+      try {
+        await saveAppDataToFirestore({ masses: newMasses, songs: newSongs, sheets: newSheets });
+      } catch (err) {
+        console.error('[Data] Commit to Firestore failed:', err);
+      }
     }
   };
-
-  // Sync Local Data Changes to Cloud Firestore
-  useEffect(() => {
-    if (!currentUser || !isDataLoadedRef.current) return;
-
-    localStorage.setItem('cantus_so_tay_masses', JSON.stringify(masses));
-    localStorage.setItem('cantus_so_tay_songs', JSON.stringify(songs));
-    localStorage.setItem('cantus_so_tay_sheets', JSON.stringify(sheets));
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        await saveAppDataToFirestore({ masses, songs, sheets });
-      } catch (e) {
-        console.error('[Data] Cloud Firestore sync save failed:', e);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
-  }, [masses, songs, sheets, currentUser]);
 
   // Handle Logout
   const handleLogout = async () => {
@@ -142,28 +151,27 @@ export default function App() {
 
   // SAVE MASS PROGRAM
   const handleSaveMass = (updatedMass: MassEvent, newSongsToCreate?: Song[]) => {
+    let updatedSongs = [...songs];
     if (newSongsToCreate && newSongsToCreate.length > 0) {
-      setSongs(prev => {
-        const existingTitles = new Set(prev.map(s => s.title.toLowerCase().trim()));
-        const uniqueNew = newSongsToCreate.filter(ns => !existingTitles.has(ns.title.toLowerCase().trim()));
-        return [...uniqueNew, ...prev];
-      });
+      const existingTitles = new Set(songs.map(s => s.title.toLowerCase().trim()));
+      const uniqueNew = newSongsToCreate.filter(ns => !existingTitles.has(ns.title.toLowerCase().trim()));
+      if (uniqueNew.length > 0) {
+        updatedSongs = [...uniqueNew, ...songs];
+      }
     }
 
-    setMasses(prev => {
-      const idx = prev.findIndex(m => m.id === updatedMass.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = updatedMass;
-        return copy;
-      }
-      return [updatedMass, ...prev];
-    });
+    const idx = masses.findIndex(m => m.id === updatedMass.id);
+    const updatedMasses = idx >= 0
+      ? masses.map((m, i) => (i === idx ? updatedMass : m))
+      : [updatedMass, ...masses];
+
+    commitAppData(updatedMasses, updatedSongs, sheets);
   };
 
-  // DELETE MASS
+  // DELETE MASS (Immediately persisted to Firestore)
   const handleDeleteMass = (id: string) => {
-    setMasses(prev => prev.filter(m => m.id !== id));
+    const updatedMasses = masses.filter(m => m.id !== id);
+    commitAppData(updatedMasses, songs, sheets);
   };
 
   // DUPLICATE MASS
@@ -176,57 +184,50 @@ export default function App() {
       status: 'DRAFT',
       createdAt: new Date().toISOString()
     };
-    setMasses(prev => [duplicated, ...prev]);
+    commitAppData([duplicated, ...masses], songs, sheets);
   };
 
   // SAVE / DELETE SONG
   const handleSaveSong = (song: Song) => {
-    setSongs(prev => {
-      const idx = prev.findIndex(s => s.id === song.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = song;
-        return copy;
-      }
-      return [song, ...prev];
-    });
+    const idx = songs.findIndex(s => s.id === song.id);
+    const updatedSongs = idx >= 0
+      ? songs.map((s, i) => (i === idx ? song : s))
+      : [song, ...songs];
+    commitAppData(masses, updatedSongs, sheets);
   };
 
   const handleDeleteSong = (id: string) => {
-    setSongs(prev => prev.filter(s => s.id !== id));
+    const updatedSongs = songs.filter(s => s.id !== id);
+    commitAppData(masses, updatedSongs, sheets);
   };
 
   // SAVE / DELETE SHEET
   const handleSaveSheet = (sheet: SheetArchive, newSongToCreate?: Song) => {
+    let updatedSongs = [...songs];
     if (newSongToCreate) {
-      handleSaveSong(newSongToCreate);
+      const idx = songs.findIndex(s => s.id === newSongToCreate.id);
+      updatedSongs = idx >= 0
+        ? songs.map((s, i) => (i === idx ? newSongToCreate : s))
+        : [newSongToCreate, ...songs];
     }
-    setSheets(prev => {
-      const idx = prev.findIndex(s => s.id === sheet.id);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = sheet;
-        return copy;
-      }
-      return [sheet, ...prev];
-    });
+    const idx = sheets.findIndex(s => s.id === sheet.id);
+    const updatedSheets = idx >= 0
+      ? sheets.map((s, i) => (i === idx ? sheet : s))
+      : [sheet, ...sheets];
+    commitAppData(masses, updatedSongs, updatedSheets);
   };
 
   const handleDeleteSheet = (id: string) => {
-    setSheets(prev => prev.filter(s => s.id !== id));
+    const updatedSheets = sheets.filter(s => s.id !== id);
+    commitAppData(masses, songs, updatedSheets);
   };
 
   // RESTORE FULL DATA
   const handleRestoreData = (restored: { masses: MassEvent[]; songs: Song[]; sheets: SheetArchive[] }, mode: 'REPLACE' | 'MERGE') => {
-    if (mode === 'REPLACE') {
-      if (restored.masses) setMasses(restored.masses);
-      if (restored.songs) setSongs(restored.songs);
-      if (restored.sheets) setSheets(restored.sheets);
-    } else {
-      if (restored.masses) setMasses(prev => [...restored.masses, ...prev]);
-      if (restored.songs) setSongs(prev => [...restored.songs, ...prev]);
-      if (restored.sheets) setSheets(prev => [...restored.sheets, ...prev]);
-    }
+    const newMasses = mode === 'REPLACE' ? (restored.masses || []) : [...(restored.masses || []), ...masses];
+    const newSongs = mode === 'REPLACE' ? (restored.songs || []) : [...(restored.songs || []), ...songs];
+    const newSheets = mode === 'REPLACE' ? (restored.sheets || []) : [...(restored.sheets || []), ...sheets];
+    commitAppData(newMasses, newSongs, newSheets);
   };
 
   // 1. SHOW LOADING SCREEN WHILE VERIFYING SESSION
@@ -255,7 +256,6 @@ export default function App() {
       <LoginView
         onLoginSuccess={(user) => {
           setCurrentUser(user);
-          loadAppData();
         }}
       />
     );

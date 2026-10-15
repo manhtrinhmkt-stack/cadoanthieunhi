@@ -17,6 +17,7 @@ import {
   getDoc,
   getDocFromServer,
   setDoc,
+  onSnapshot,
   Firestore
 } from 'firebase/firestore';
 import defaultConfig from '../../firebase-applet-config.json';
@@ -141,13 +142,37 @@ export async function loadAppDataFromFirestore(): Promise<{ masses?: any[]; song
   return null;
 }
 
+export function subscribeToAppData(
+  onData: (data: { masses: any[]; songs: any[]; sheets: any[] }) => void,
+  onError?: (err: any) => void
+): () => void {
+  const docRef = doc(db, 'app_data', APP_DATA_DOC);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        onData({
+          masses: Array.isArray(data?.masses) ? data.masses : [],
+          songs: Array.isArray(data?.songs) ? data.songs : [],
+          sheets: Array.isArray(data?.sheets) ? data.sheets : []
+        });
+      }
+    },
+    (error) => {
+      console.error('[Firestore onSnapshot Error]:', error);
+      if (onError) onError(error);
+    }
+  );
+}
+
 export async function saveAppDataToFirestore(payload: { masses?: any[]; songs?: any[]; sheets?: any[] }): Promise<void> {
   try {
     const docRef = doc(db, 'app_data', APP_DATA_DOC);
     await setDoc(docRef, {
-      masses: payload.masses || [],
-      songs: payload.songs || [],
-      sheets: payload.sheets || [],
+      masses: payload.masses ?? [],
+      songs: payload.songs ?? [],
+      sheets: payload.sheets ?? [],
       updatedAt: new Date().toISOString()
     }, { merge: true });
   } catch (error: any) {
@@ -155,3 +180,4 @@ export async function saveAppDataToFirestore(payload: { masses?: any[]; songs?: 
     throw error;
   }
 }
+
