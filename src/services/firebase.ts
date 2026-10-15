@@ -171,12 +171,17 @@ export function subscribeToAppData(
 export async function saveAppDataToFirestore(payload: { masses?: any[]; songs?: any[]; sheets?: any[] }): Promise<void> {
   try {
     const docRef = doc(db, 'app_data', APP_DATA_DOC);
-    await setDoc(docRef, {
-      masses: payload.masses ?? [],
-      songs: payload.songs ?? [],
-      sheets: payload.sheets ?? [],
-      updatedAt: new Date().toISOString()
-    });
+    // Firestore setDoc throws an error if any field in the document or arrays is undefined.
+    // Serializing through JSON strips all undefined values safely and ensures clean Firestore schema.
+    const sanitized = JSON.parse(
+      JSON.stringify({
+        masses: payload.masses ?? [],
+        songs: payload.songs ?? [],
+        sheets: payload.sheets ?? [],
+        updatedAt: new Date().toISOString()
+      })
+    );
+    await setDoc(docRef, sanitized);
   } catch (error: any) {
     console.error('[Firestore] Failed to save app data:', error);
     throw error;

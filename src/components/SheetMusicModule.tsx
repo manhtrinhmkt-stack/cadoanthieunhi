@@ -43,6 +43,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
   const [noteInput, setNoteInput] = useState('');
 
   const [codeWarning, setCodeWarning] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Autocomplete suggestions
   const songSuggestions = songs.filter(s => 
@@ -69,6 +70,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
     setLocationInput('Tủ A - Ngăn 01');
     setNoteInput('');
     setCodeWarning('');
+    setFormError(null);
     setShowAddModal(true);
   };
 
@@ -76,16 +78,20 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
     setStorageCodeInput(code);
     const existing = sheets.find(s => s.storageCode.toLowerCase().trim() === code.toLowerCase().trim() && s.id !== editingSheet?.id);
     if (existing) {
-      setCodeWarning(`Cảnh báo: Mã '${code}' đã tồn tại cho bài '${existing.songTitle}'!`);
+      setCodeWarning(`Mã '${code}' hiện đang dùng cho bài '${existing.songTitle}'. Bạn vẫn có thể lưu nếu đây là tập/bản in bổ sung.`);
     } else {
       setCodeWarning('');
     }
   };
 
   const handleSaveSheetForm = () => {
-    if (!songInputQuery.trim() || !storageCodeInput.trim()) return;
-
-    if (codeWarning) {
+    setFormError(null);
+    if (!songInputQuery.trim()) {
+      setFormError('Vui lòng nhập tên bài hát.');
+      return;
+    }
+    if (!storageCodeInput.trim()) {
+      setFormError('Vui lòng nhập mã lưu trữ bản in (e.g. NL-001, HL-025).');
       return;
     }
 
@@ -113,17 +119,18 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
 
     const sheet: SheetArchive = {
       id: editingSheet ? editingSheet.id : 'a-' + Date.now(),
-      songId: finalSongId,
+      songId: finalSongId || '',
       songTitle: songInputQuery.trim(),
       composer: composerInput.trim() || 'Chưa rõ',
       storageCode: storageCodeInput.trim(),
-      printDate: printDateInput,
-      quantity: quantityInput,
-      currentQty: quantityInput,
-      currentQuantity: quantityInput,
+      printDate: printDateInput || new Date().toISOString().substring(0, 10),
+      quantity: Number(quantityInput) || 1,
+      currentQty: Number(quantityInput) || 1,
+      currentQuantity: Number(quantityInput) || 1,
       location: locationInput.trim() || 'Tủ A - Ngăn 01',
-      note: noteInput.trim(),
-      createdAt: new Date().toISOString()
+      note: noteInput.trim() || '',
+      createdAt: editingSheet?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     onSaveSheet(sheet, newSongToCreate);
@@ -207,6 +214,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
                   setLocationInput(s.location);
                   setNoteInput(s.note || '');
                   setCodeWarning('');
+                  setFormError(null);
                   setShowAddModal(true);
                 }}
                 className="min-h-[34px] px-3 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
@@ -278,6 +286,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
                           setLocationInput(s.location);
                           setNoteInput(s.note || '');
                           setCodeWarning('');
+                          setFormError(null);
                           setShowAddModal(true);
                         }}
                         className="p-1.5 text-amber-800 hover:bg-amber-100 rounded cursor-pointer"
@@ -439,7 +448,18 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
               />
             </div>
 
-            <button onClick={handleSaveSheetForm} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-md shadow-xs">
+            {formError && (
+              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <button 
+              type="button"
+              onClick={handleSaveSheetForm} 
+              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl shadow-xs transition-all cursor-pointer"
+            >
               Lưu bản nhạc in
             </button>
           </div>

@@ -622,7 +622,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
             <span className="flex items-center gap-1 text-emerald-900"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span> Mùa Thường Niên</span>
             <span className="flex items-center gap-1 text-purple-900"><span className="w-2.5 h-2.5 rounded bg-purple-600 inline-block"></span> Mùa Vọng / Chay</span>
             <span className="flex items-center gap-1 text-amber-900"><span className="w-2.5 h-2.5 rounded bg-amber-400 inline-block"></span> Giáng Sinh & Phục Sinh</span>
-            <span className="flex items-center gap-1 text-rose-900"><span className="w-2.5 h-2.5 rounded bg-rose-600 inline-block"></span> Lễ Trọng / Tử Đạo</span>
+            <span className="flex items-center gap-1 text-rose-900"><span className="w-2.5 h-2.5 rounded bg-rose-600 inline-block"></span> Lễ Trọng</span>
           </div>
         </div>
       </aside>
