@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, User, Eye, EyeOff, LogIn, Sparkles, ShieldCheck, Cross } from 'lucide-react';
+import { loginWithUsername } from '../services/firebase';
 
 interface LoginViewProps {
   onLoginSuccess: (user: { username: string; displayName?: string }) => void;
@@ -23,37 +24,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-
-      const contentType = res.headers.get('content-type') || '';
-      let data: any = {};
-
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const rawText = await res.text();
-        if (rawText.includes('Authentication') || rawText.includes('Protection') || res.status === 401) {
-          throw new Error('Vercel đang bật chế độ "Deployment Protection" nên chặn API request. Vui lòng vào Vercel Settings -> Deployment Protection và TẮT "Standard Protection".');
-        }
-        throw new Error(`Máy chủ phản hồi trạng thái ${res.status} không đúng định dạng JSON.`);
-      }
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Tên đăng nhập hoặc mật khẩu không chính xác.');
-      }
-
-      // Save token in fallback storage if provided
-      if (data.token) {
-        localStorage.setItem('cantus_session_token', data.token);
-      }
-
-      onLoginSuccess(data.user);
+      const user = await loginWithUsername(username, password);
+      onLoginSuccess(user);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Không thể kết nối tới hệ thống xác thực.');
+      console.error('[Login] Authentication error:', err);
+      const code = err?.code || '';
+      const msg = err?.message || '';
+
+      if (code === 'auth/operation-not-allowed' || msg.includes('PASSWORD_LOGIN_DISABLED')) {
+        setErrorMsg('Dự án Firebase chưa bật tính năng Email/Password. Vui lòng vào Firebase Console -> Authentication -> Sign-in method -> Bật "Email/Password".');
+      } else if (
+        code === 'auth/user-not-found' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/invalid-credential' ||
+        code === 'auth/invalid-email'
+      ) {
+        setErrorMsg('Tên đăng nhập hoặc mật khẩu không chính xác.');
+      } else if (code === 'auth/too-many-requests') {
+        setErrorMsg('Đăng nhập thất bại quá nhiều lần. Vui lòng thử lại sau ít phút.');
+      } else {
+        setErrorMsg(msg || 'Không thể kết nối tới dịch vụ xác thực Firebase.');
+      }
     } finally {
       setIsSubmitting(false);
     }

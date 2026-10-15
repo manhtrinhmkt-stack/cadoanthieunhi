@@ -12,6 +12,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { MassEvent, Song, SheetArchive } from '../types/cantus';
+import { changeCurrentUserPassword } from '../services/firebase';
 
 interface SettingsModuleProps {
   userEmail?: string;
@@ -321,29 +322,20 @@ const ChangePasswordCard: React.FC = () => {
     setMsg(null);
 
     try {
-      const token = localStorage.getItem('cantus_session_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ currentPassword, newPassword })
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Không thể đổi mật khẩu.');
-      }
+      await changeCurrentUserPassword(currentPassword, newPassword);
 
       setMsg({ type: 'success', text: 'Đổi mật khẩu thành công! Hãy ghi nhớ mật khẩu mới của bạn.' });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setMsg({ type: 'error', text: err.message || 'Lỗi khi đổi mật khẩu.' });
+      console.error('[ChangePassword] Error:', err);
+      const code = err?.code || '';
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setMsg({ type: 'error', text: 'Mật khẩu hiện tại không chính xác.' });
+      } else {
+        setMsg({ type: 'error', text: err.message || 'Lỗi khi đổi mật khẩu.' });
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -27,6 +27,14 @@ import { SheetMusicModule } from './components/SheetMusicModule';
 import { SettingsModule } from './components/SettingsModule';
 import { PdfPrintView } from './components/PdfPrintView';
 import { LoginView } from './components/LoginView';
+import { 
+  auth, 
+  logoutUser, 
+  loadAppDataFromFirestore, 
+  saveAppDataToFirestore, 
+  emailToUsername 
+} from './services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function App() {
   // Authentication & User Session State
@@ -52,78 +60,50 @@ export default function App() {
   // Track initial load to prevent overwriting cloud data on startup
   const isDataLoadedRef = useRef(false);
 
-  // Check Session on App Launch (Persistent 30-day session)
+  // Check Session on App Launch (Persistent Firebase Auth Session)
   useEffect(() => {
-    async function checkAuthSession() {
-      setIsCheckingAuth(true);
-      try {
-        const token = localStorage.getItem('cantus_session_token');
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const res = await fetch('/api/auth/me', { headers });
-        const contentType = res.headers.get('content-type') || '';
-        if (res.ok && contentType.includes('application/json')) {
-          const data = await res.json();
-          if (data.authenticated && data.user) {
-            setCurrentUser(data.user);
-            if (data.token) {
-              localStorage.setItem('cantus_session_token', data.token);
-            }
-            // Load data from backend / Firestore
-            await loadAppData(data.token || token);
-          } else {
-            setCurrentUser(null);
-          }
-        } else {
-          setCurrentUser(null);
-        }
-      } catch (e) {
-        console.error('[Auth] Session check failed:', e);
+    setIsCheckingAuth(true);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const username = emailToUsername(firebaseUser.email);
+        setCurrentUser({
+          username,
+          displayName: username === 'admin' ? 'Ban Quản Trị' : (firebaseUser.displayName || username)
+        });
+        await loadAppData();
+      } else {
         setCurrentUser(null);
-      } finally {
-        setIsCheckingAuth(false);
+        isDataLoadedRef.current = false;
       }
-    }
+      setIsCheckingAuth(false);
+    });
 
-    checkAuthSession();
+    return () => unsubscribe();
   }, []);
 
-  // Fetch Cloud / Firestore Data upon Successful Login
-  const loadAppData = async (authToken?: string) => {
+  // Fetch Cloud Firestore Data upon Successful Login
+  const loadAppData = async () => {
     try {
-      const token = authToken || localStorage.getItem('cantus_session_token');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const res = await fetch('/api/data/load', { headers });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const result = await res.json();
-        if (result.success && result.data) {
-          if (result.data.masses && result.data.masses.length > 0) {
-            setMasses(result.data.masses);
-          }
-          if (result.data.songs && result.data.songs.length > 0) {
-            setSongs(result.data.songs);
-          }
-          if (result.data.sheets && result.data.sheets.length > 0) {
-            setSheets(result.data.sheets);
-          }
+      const data = await loadAppDataFromFirestore();
+      if (data) {
+        if (data.masses && data.masses.length > 0) {
+          setMasses(data.masses);
+        }
+        if (data.songs && data.songs.length > 0) {
+          setSongs(data.songs);
+        }
+        if (data.sheets && data.sheets.length > 0) {
+          setSheets(data.sheets);
         }
       }
     } catch (err) {
-      console.error('[Data] Load backend app data error:', err);
+      console.error('[Data] Load Firestore app data error:', err);
     } finally {
       isDataLoadedRef.current = true;
     }
   };
 
-  // Sync Local Data Changes to Backend / Firestore
+  // Sync Local Data Changes to Cloud Firestore
   useEffect(() => {
     if (!currentUser || !isDataLoadedRef.current) return;
 
@@ -133,19 +113,9 @@ export default function App() {
 
     const timeoutId = setTimeout(async () => {
       try {
-        const token = localStorage.getItem('cantus_session_token');
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        await fetch('/api/data/save', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ masses, songs, sheets })
-        });
+        await saveAppDataToFirestore({ masses, songs, sheets });
       } catch (e) {
-        console.error('[Data] Cloud sync save failed:', e);
+        console.error('[Data] Cloud Firestore sync save failed:', e);
       }
     }, 1000);
 
@@ -155,17 +125,12 @@ export default function App() {
   // Handle Logout
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('cantus_session_token');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      await fetch('/api/auth/logout', { method: 'POST', headers });
+      await logoutUser();
     } catch (e) {
       console.error('[Auth] Logout error:', e);
     } finally {
-      localStorage.removeItem('cantus_session_token');
       setCurrentUser(null);
+      isDataLoadedRef.current = false;
     }
   };
 
