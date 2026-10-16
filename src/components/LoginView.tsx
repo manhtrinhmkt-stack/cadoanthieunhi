@@ -7,9 +7,12 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    return localStorage.getItem('cantus_saved_username') || '';
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -24,7 +27,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setErrorMsg(null);
 
     try {
-      const user = await loginWithUsername(username, password);
+      if (rememberMe) {
+        localStorage.setItem('cantus_saved_username', username.trim());
+      } else {
+        localStorage.removeItem('cantus_saved_username');
+      }
+      const user = await loginWithUsername(username, password, rememberMe);
       onLoginSuccess(user);
     } catch (err: any) {
       console.error('[Login] Authentication error:', err);
@@ -134,6 +142,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
 
+          {/* Remember Me Checkbox */}
+          <div className="flex items-center pt-0.5">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-indigo-700 border-stone-300 rounded focus:ring-indigo-600 focus:ring-offset-0 cursor-pointer accent-indigo-700"
+              />
+              <span className="text-xs sm:text-sm font-semibold text-stone-700">
+                Ghi nhớ đăng nhập
+              </span>
+            </label>
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
@@ -158,7 +181,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         <div className="pt-4 border-t border-stone-100 text-center space-y-1 relative z-10">
           <p className="text-[11px] text-stone-500 font-medium flex items-center justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Hệ thống bảo mật nội bộ &amp; Duy trì phiên 30 ngày</span>
+            <span>Hệ thống bảo mật nội bộ Ca đoàn</span>
           </p>
         </div>
 

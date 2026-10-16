@@ -14,8 +14,8 @@ import { generateStorageCode, matchVietnameseText, formatDateToDDMMYYYY } from '
 interface SheetMusicModuleProps {
   sheets: SheetArchive[];
   songs: Song[];
-  onSaveSheet: (sheet: SheetArchive, newSongToCreate?: Song) => void;
-  onDeleteSheet: (id: string) => void;
+  onSaveSheet: (sheet: SheetArchive, newSongToCreate?: Song) => Promise<void> | void;
+  onDeleteSheet: (id: string) => Promise<void> | void;
 }
 
 export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
@@ -27,6 +27,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSheet, setEditingSheet] = useState<SheetArchive | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [deleteConfirmSheet, setDeleteConfirmSheet] = useState<SheetArchive | null>(null);
 
@@ -84,7 +85,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
     }
   };
 
-  const handleSaveSheetForm = () => {
+  const handleSaveSheetForm = async () => {
     setFormError(null);
     if (!songInputQuery.trim()) {
       setFormError('Vui lòng nhập tên bài hát.');
@@ -133,18 +134,25 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
       updatedAt: new Date().toISOString()
     };
 
-    onSaveSheet(sheet, newSongToCreate);
-    setShowAddModal(false);
+    try {
+      setIsSaving(true);
+      await onSaveSheet(sheet, newSongToCreate);
+      setShowAddModal(false);
+    } catch (saveErr: any) {
+      setFormError('Không thể lưu bản in: ' + (saveErr?.message || 'Lỗi kết nối'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Header & Controls */}
-      <div className="bg-white rounded-xl p-5 sm:p-6 border border-stone-200 shadow-2xs space-y-4">
+      <div className="shrink-0 bg-white rounded-xl p-4 sm:p-5 border border-stone-200 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-              <FolderArchive className="w-5 h-5 text-slate-800" />
+              <FolderArchive className="w-5 h-5 text-indigo-700" />
               <span>Kho Bản Nhạc In Giấy ({sheets.length} đầu tài liệu)</span>
             </h2>
             <p className="text-xs text-stone-500 font-medium mt-0.5">Lưu trữ các bản in giấy, mã lưu trữ vật lý (`NL-001`, `HL-025`) & vị trí ngăn tủ.</p>
@@ -152,7 +160,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
 
           <button
             onClick={handleOpenAdd}
-            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-4.5 py-2.5 rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0"
+            className="bg-indigo-800 hover:bg-indigo-900 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-amber-400" />
             <span>+ Thêm bản nhạc in mới</span>
@@ -173,7 +181,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
       </div>
 
       {/* Mobile Card List View (Phones & Tablets) */}
-      <div className="md:hidden space-y-2.5">
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-0.5 pb-20">
         {filteredSheets.map(s => (
           <div key={s.id} className="bg-white rounded-xl p-3 border border-stone-200 shadow-2xs space-y-2">
             <div className="flex items-start justify-between gap-2">
@@ -181,8 +189,8 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
                 <span className="bg-indigo-50 text-indigo-950 px-2 py-0.5 rounded-md border border-indigo-200 font-mono font-bold text-xs inline-block">
                   {s.storageCode}
                 </span>
-                <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{s.songTitle}</h4>
-                <p className="text-xs text-stone-500 font-normal">{s.composer}</p>
+                <h4 className="font-extrabold text-slate-950 text-sm sm:text-base line-clamp-1">{s.songTitle}</h4>
+                <p className="text-xs text-stone-600 font-medium">{s.composer}</p>
               </div>
 
               <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-xs shrink-0">
@@ -190,13 +198,13 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-stone-600 pt-1 border-t border-stone-100">
-              <div>Vị trí: <strong className="text-slate-900">{s.location}</strong></div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-stone-600 pt-1 border-t border-stone-100">
+              <div>Vị trí: <strong className="text-slate-900 font-semibold">{s.location}</strong></div>
               <div className="text-right">Ngày in: <strong>{formatDateToDDMMYYYY(s.printDate)}</strong></div>
             </div>
 
             {s.note && (
-              <p className="text-[11px] text-stone-500 italic bg-stone-50 p-1.5 rounded">
+              <p className="text-xs text-stone-500 italic bg-stone-50 p-1.5 rounded">
                 Ghi chú: {s.note}
               </p>
             )}
@@ -217,7 +225,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
                   setFormError(null);
                   setShowAddModal(true);
                 }}
-                className="min-h-[34px] px-3 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
+                className="min-h-[34px] px-3 bg-stone-100 hover:bg-stone-200 text-slate-900 font-semibold text-xs rounded-md flex items-center gap-1 cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5 text-indigo-700" />
                 <span>Sửa</span>
@@ -225,7 +233,7 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
 
               <button
                 onClick={() => setDeleteConfirmSheet(s)}
-                className="min-h-[34px] px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
+                className="min-h-[34px] px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold text-xs rounded-md flex items-center gap-1 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Xóa</span>
@@ -241,19 +249,19 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
         )}
       </div>
 
-      {/* Desktop Sheets Table */}
-      <div className="hidden md:block bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Desktop Sheets Table (Scrollable with sticky header) */}
+      <div className="hidden md:flex flex-col flex-1 min-h-0 bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm text-slate-700 border-collapse">
-            <thead className="bg-stone-50/90 font-bold text-slate-900 border-b border-stone-200">
+            <thead className="sticky top-0 bg-stone-50/95 backdrop-blur-xs z-10 font-bold text-slate-900 border-b border-stone-200 shadow-2xs">
               <tr>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Mã Lưu Trữ</th>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Tên Bài Hát & Nhạc Sĩ</th>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Ngày In</th>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Số Lượng</th>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Vị Trí Tủ Lưu</th>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Ghi Chú</th>
-                <th className="px-4 py-3.5 sm:px-5 sm:py-4">Thao Tác</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5">Mã Lưu Trữ</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5">Tên Bài Hát & Nhạc Sĩ</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5">Ngày In</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5">Số Lượng</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5">Vị Trí Tủ Lưu</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5">Ghi Chú</th>
+                <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-right">Thao Tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -265,8 +273,8 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
                     </span>
                   </td>
                   <td className="px-4 py-3.5 sm:px-5 sm:py-4">
-                    <strong className="text-slate-900 block font-bold text-xs sm:text-sm">{s.songTitle}</strong>
-                    <span className="text-stone-500 font-normal text-xs">{s.composer}</span>
+                    <strong className="text-slate-950 block font-extrabold text-sm sm:text-base tracking-tight">{s.songTitle}</strong>
+                    <span className="text-stone-600 font-medium text-xs sm:text-sm">{s.composer}</span>
                   </td>
                   <td className="px-4 py-3.5 sm:px-5 sm:py-4 font-medium text-stone-600 font-sans">{formatDateToDDMMYYYY(s.printDate)}</td>
                   <td className="px-4 py-3.5 sm:px-5 sm:py-4 font-semibold text-emerald-800">{s.quantity || s.currentQty} bản</td>
@@ -457,10 +465,18 @@ export const SheetMusicModule: React.FC<SheetMusicModuleProps> = ({
 
             <button 
               type="button"
+              disabled={isSaving}
               onClick={handleSaveSheetForm} 
-              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl shadow-xs transition-all cursor-pointer"
+              className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 font-bold py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              Lưu bản nhạc in
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                  <span>Đang lưu bản in lên Cloud...</span>
+                </>
+              ) : (
+                <span>Lưu bản nhạc in</span>
+              )}
             </button>
           </div>
         </div>

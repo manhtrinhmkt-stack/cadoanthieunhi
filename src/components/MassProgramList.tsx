@@ -18,13 +18,12 @@ import {
   Zap,
   Filter,
   Layers,
-  FileSpreadsheet,
   Download,
-  LayoutGrid,
   CheckCircle2,
   Clock,
   Mic,
-  Volume2
+  Volume2,
+  FolderArchive
 } from 'lucide-react';
 import { MassEvent, MassProgramItem, Song, LiturgicalSeason, ProgramStatus, MassPosition } from '../types/cantus';
 import { 
@@ -56,13 +55,22 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   onDuplicateMass,
   onOpenPdfPrint,
 }) => {
-  // Responsive Display Mode: CARDS (Mobile-First Day Cards) vs MATRIX (Desktop Excel Grid)
-  const [displayMode, setDisplayMode] = useState<'CARDS' | 'MATRIX'>(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      return 'CARDS';
-    }
-    return 'MATRIX';
-  });
+  // Schedule Display Mode: Default to MATRIX Excel Grid
+  const [displayMode, setDisplayMode] = useState<'CARDS' | 'MATRIX'>('MATRIX');
+
+  // Time Scope Filter: 'UPCOMING' (Default: Ẩn các ngày đã qua) | 'ARCHIVE' (Kho lưu trữ ngày đã qua) | 'ALL'
+  const [timeScope, setTimeScope] = useState<'UPCOMING' | 'ARCHIVE' | 'ALL'>('UPCOMING');
+  
+  const getTodayLocalStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = getTodayLocalStr();
+  const upcomingCount = masses.filter(m => (m.date || '') >= todayStr).length;
+  const archivedCount = masses.filter(m => (m.date || '') < todayStr).length;
 
   // Filter View mode: 'THEO_MUA' | 'THEO_THANG' | 'THEO_NAM' | 'ALL'
   const [viewMode, setViewMode] = useState<'THEO_MUA' | 'THEO_THANG' | 'THEO_NAM' | 'ALL'>('ALL');
@@ -105,10 +113,20 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
   // Filtered masses logic
   const filteredMasses = masses.filter(m => {
+    // 1. Time Scope Filter: Hide past days when UPCOMING; only show past days when ARCHIVE
+    const isPast = (m.date || '') < todayStr;
+    if (timeScope === 'UPCOMING' && isPast) return false;
+    if (timeScope === 'ARCHIVE' && !isPast) return false;
+
+    // 2. Search filter
     const searchMatch = !filterSearch.trim() || 
       matchVietnameseText(m.title || m.name || '', filterSearch) || 
       (m.date || '').includes(filterSearch) ||
-      m.program.some(p => matchVietnameseText(p.title || '', filterSearch) || matchVietnameseText(p.composer || '', filterSearch));
+      m.program.some(p => 
+        matchVietnameseText(p.title || '', filterSearch) || 
+        matchVietnameseText(p.composer || '', filterSearch) ||
+        (p.soloSinger && matchVietnameseText(p.soloSinger, filterSearch))
+      );
 
     if (!searchMatch) return false;
 
@@ -133,7 +151,13 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
     }
 
     return true;
-  }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }).sort((a, b) => {
+    // If in Archive, sort newest past day first for convenient search/lookup; otherwise chronological
+    if (timeScope === 'ARCHIVE') {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    }
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
+  });
 
   // Auto create Sunday Mass
   const handleAutoCreateSunday = () => {
@@ -364,67 +388,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-3.5 items-stretch min-h-0 md:h-full md:overflow-hidden">
 
-      {/* TOP RESPONSIVE CONTROL BAR (MOBILE & DESKTOP) */}
-      <div className="lg:hidden w-full bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-2 shrink-0">
-        
-        {/* Toggle Mode: CARDS vs MATRIX */}
-        <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg border border-stone-200">
-          <button
-            onClick={() => setDisplayMode('CARDS')}
-            className={`flex-1 min-h-[38px] flex items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-              displayMode === 'CARDS'
-                ? 'bg-slate-900 text-white shadow-2xs'
-                : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/60'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4 text-amber-400" />
-            <span>📱 Thẻ Ngày Lễ</span>
-          </button>
 
-          <button
-            onClick={() => setDisplayMode('MATRIX')}
-            className={`flex-1 min-h-[38px] flex items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-              displayMode === 'MATRIX'
-                ? 'bg-slate-900 text-white shadow-2xs'
-                : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/60'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>📊 Bảng Ma Trận</span>
-          </button>
-        </div>
-
-        {/* Quick Actions Row */}
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            className="flex-1 min-h-[36px] flex items-center justify-center gap-1.5 text-stone-800 font-bold text-xs bg-stone-50 hover:bg-stone-100 px-2.5 py-1.5 rounded-lg border border-stone-200 cursor-pointer"
-          >
-            <Filter className="w-3.5 h-3.5 text-indigo-700" />
-            <span>{isMobileSidebarOpen ? 'Ẩn Bộ Lọc' : 'Bộ Lọc & Tìm'}</span>
-            <span className="text-[10px] bg-indigo-100 text-indigo-900 px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
-              {filteredMasses.length}
-            </span>
-          </button>
-
-          <button
-            onClick={handleAutoCreateSunday}
-            className="flex-1 min-h-[36px] flex items-center justify-center gap-1 text-white font-bold text-xs bg-emerald-700 hover:bg-emerald-800 px-2.5 py-1.5 rounded-lg shadow-2xs cursor-pointer"
-            title="Tự động tạo Chúa Nhật kế tiếp"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-            <span>+ Tạo Chúa Nhật</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenEditModal(null)}
-            className="min-h-[36px] min-w-[36px] flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-2xs cursor-pointer"
-            title="Thêm lễ mới"
-          >
-            <Plus className="w-4 h-4 text-amber-400" />
-          </button>
-        </div>
-      </div>
 
       {/* LEFT SIDEBAR CONTROLS PANEL */}
       <aside className={`w-full lg:w-72 shrink-0 bg-white border border-stone-200 rounded-xl p-3.5 sm:p-4 shadow-2xs space-y-3.5 lg:overflow-y-auto lg:max-h-full ${
@@ -441,37 +405,61 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
           </span>
         </div>
 
-        {/* Display Mode Toggle for Desktop */}
-        <div className="hidden lg:block space-y-1.5">
+        {/* Time Scope Toggle: Lịch Sắp Tới vs Kho Lưu Trữ */}
+        <div className="space-y-1.5">
           <label className="text-xs font-bold text-stone-700 block">
-            Chế Độ Xem:
+            Thời Gian Phụng Vụ:
           </label>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200">
             <button
-              onClick={() => setDisplayMode('CARDS')}
-              className={`p-2 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                displayMode === 'CARDS'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-stone-50 text-stone-700 hover:bg-stone-100 border border-stone-200'
+              onClick={() => setTimeScope('UPCOMING')}
+              className={`min-h-[38px] flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                timeScope === 'UPCOMING'
+                  ? 'bg-indigo-700 text-white shadow-2xs'
+                  : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5 text-amber-400" />
-              <span>Thẻ Ngày Lễ</span>
+              <Calendar className="w-3.5 h-3.5 text-amber-300" />
+              <span>Sắp Tới</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${timeScope === 'UPCOMING' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+                {upcomingCount}
+              </span>
             </button>
 
             <button
-              onClick={() => setDisplayMode('MATRIX')}
-              className={`p-2 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                displayMode === 'MATRIX'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-stone-50 text-stone-700 hover:bg-stone-100 border border-stone-200'
+              onClick={() => setTimeScope('ARCHIVE')}
+              className={`min-h-[38px] flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                timeScope === 'ARCHIVE'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
               }`}
+              title="Mục lưu trữ để tìm kiếm các ngày lễ đã qua"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Ma Trận Excel</span>
+              <FolderArchive className="w-3.5 h-3.5 text-amber-200" />
+              <span>Lưu Trữ</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${timeScope === 'ARCHIVE' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+                {archivedCount}
+              </span>
             </button>
           </div>
+          {timeScope !== 'ALL' ? (
+            <button
+              onClick={() => setTimeScope('ALL')}
+              className="text-[11px] text-stone-500 hover:text-indigo-700 underline block text-center w-full pt-0.5 cursor-pointer"
+            >
+              Xem tất cả ({masses.length} ngày lễ)
+            </button>
+          ) : (
+            <div className="flex items-center justify-between text-[11px] text-indigo-700 font-semibold px-1">
+              <span>Đang xem tất cả</span>
+              <button onClick={() => setTimeScope('UPCOMING')} className="underline cursor-pointer">
+                Chỉ xem sắp tới
+              </button>
+            </div>
+          )}
         </div>
+
+
 
         {/* Quick Search */}
         <div className="space-y-1">
@@ -628,26 +616,164 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
       </aside>
 
       {/* MAIN WORKSPACE CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 w-full min-h-0 md:h-full md:overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 w-full min-h-0 h-full overflow-hidden space-y-2">
         
-        {/* VIEW 1: DAY CARDS VIEW (OPTIMIZED FOR MOBILE PHONES & EASY DAY MANAGEMENT) */}
-        {displayMode === 'CARDS' && (
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5">
-            {/* Header info bar */}
-            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-between gap-2 text-xs font-semibold text-stone-700">
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4 text-indigo-700" />
-                <span>Hiển thị <strong>{filteredMasses.length}</strong> ngày lễ theo dạng Thẻ</span>
+        {/* UNIVERSAL TOP SCOPE & ACTIONS BAR */}
+        <div className="bg-white rounded-xl border border-stone-200 p-2 sm:p-2.5 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
+          
+          {/* Time Scope Tabs: UPCOMING (Ẩn các ngày đã qua) vs ARCHIVE (Mục Lưu Trữ) */}
+          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200/80">
+            <button
+              onClick={() => setTimeScope('UPCOMING')}
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                timeScope === 'UPCOMING'
+                  ? 'bg-indigo-700 text-white shadow-2xs'
+                  : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
+              }`}
+            >
+              <Calendar className="w-4 h-4 text-amber-300" />
+              <span>Lịch Sắp Tới</span>
+              <span className={`text-xs px-2 py-0.2 rounded-full font-extrabold ${timeScope === 'UPCOMING' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+                {upcomingCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setTimeScope('ARCHIVE')}
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                timeScope === 'ARCHIVE'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
+              }`}
+              title="Mục lưu trữ để tra cứu và tìm kiếm các ngày lễ đã qua"
+            >
+              <FolderArchive className="w-4 h-4 text-amber-200" />
+              <span>Mục Lưu Trữ</span>
+              <span className={`text-xs px-2 py-0.2 rounded-full font-extrabold ${timeScope === 'ARCHIVE' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+                {archivedCount}
+              </span>
+            </button>
+
+            {timeScope === 'ALL' && (
+              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1.5 rounded-lg">
+                Tất cả ({masses.length})
+              </span>
+            )}
+          </div>
+
+          {/* Right Side: Quick Actions (+ Chúa Nhật Kế, + Thêm Lễ) */}
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 flex-wrap">
+            {/* Mobile Filter Toggle Button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              className="lg:hidden px-2.5 py-1.5 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Filter className="w-3.5 h-3.5 text-indigo-700" />
+              <span>{isMobileSidebarOpen ? 'Đóng Lọc' : 'Bộ Lọc'}</span>
+            </button>
+
+            {/* Quick Create Sunday Mass button */}
+            <button
+              onClick={handleAutoCreateSunday}
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition-all"
+              title="Tự động tính ngày Chúa Nhật kế tiếp và tạo khung bài hát chuẩn"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+              <span className="hidden md:inline">+ Chúa Nhật Kế</span>
+            </button>
+
+            {/* Quick Add Custom Mass button */}
+            <button
+              onClick={() => handleOpenEditModal(null)}
+              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white shadow-2xs cursor-pointer"
+              title="Thêm chương trình lễ mới"
+            >
+              <Plus className="w-4 h-4 text-amber-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* TIME SCOPE CONTEXT BANNERS (ONLY WHEN ARCHIVE MODE IS ACTIVE) */}
+        {timeScope === 'ARCHIVE' && (
+          /* DEDICATED ARCHIVE HEADER & SEARCH PANEL */
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50/80 border border-amber-300/80 rounded-xl p-3 sm:p-4 shadow-2xs space-y-3 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <FolderArchive className="w-5 h-5 text-amber-100" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <span>Mục Lưu Trữ Thánh Lễ</span>
+                    <span className="text-xs bg-amber-200/80 text-amber-950 font-bold px-2 py-0.5 rounded-full">
+                      {filteredMasses.length} / {archivedCount} ngày đã qua
+                    </span>
+                  </h3>
+                  <p className="text-xs text-stone-600 font-medium">
+                    Tra cứu và tìm kiếm các bài hát, ca viên solo, ngày lễ đã cử hành trước đây
+                  </p>
+                </div>
               </div>
 
               <button
-                onClick={() => setDisplayMode('MATRIX')}
-                className="text-indigo-900 font-bold hover:underline flex items-center gap-1 text-[11px] cursor-pointer"
+                onClick={() => setTimeScope('UPCOMING')}
+                className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shadow-2xs transition-colors"
               >
-                <span>Xem dạng bảng lưới</span>
-                <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+                <span>← Trở lại Lịch Sắp Tới</span>
               </button>
             </div>
+
+            {/* Quick Search inside Archive */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+              <input
+                type="text"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                placeholder="Tìm kiếm trong kho lưu trữ (tên bài hát, nhạc sĩ, solo, tên ngày lễ, ngày cử hành...)"
+                className="w-full bg-white pl-9 pr-8 py-2.5 rounded-xl border border-amber-300 text-slate-900 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+              />
+              {filterSearch && (
+                <button
+                  onClick={() => setFilterSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Year Quick Filter Pills inside Archive */}
+            {years.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs pt-0.5">
+                <span className="font-bold text-stone-700 mr-1">Lọc năm:</span>
+                <button
+                  onClick={() => { setViewMode('ALL'); setSelectedYear('ALL'); }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                    viewMode === 'ALL' ? 'bg-amber-700 text-white' : 'bg-white text-stone-700 border border-stone-200 hover:bg-amber-100'
+                  }`}
+                >
+                  Tất cả các năm ({archivedCount})
+                </button>
+                {years.map(y => (
+                  <button
+                    key={y}
+                    onClick={() => { setViewMode('THEO_NAM'); setSelectedYear(y); }}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                      viewMode === 'THEO_NAM' && selectedYear === y ? 'bg-amber-700 text-white' : 'bg-white text-stone-700 border border-stone-200 hover:bg-amber-100'
+                    }`}
+                  >
+                    Năm {y}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 1: DAY CARDS VIEW (ENLARGED HIGH-LEGIBILITY TYPOGRAPHY) */}
+        {displayMode === 'CARDS' && (
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5">
 
             {/* List of Day Cards */}
             {filteredMasses.length > 0 ? (
@@ -663,26 +789,26 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                       className="bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden flex flex-col hover:border-indigo-300 transition-all"
                     >
                       {/* Top Liturgical Color Band Header */}
-                      <div className={`p-3 border-b ${style.headerBg} ${style.headerText} ${style.headerBorder} flex items-start justify-between gap-2`}>
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[11px] font-bold opacity-90">
+                      <div className={`p-3.5 sm:p-4 border-b ${style.headerBg} ${style.headerText} ${style.headerBorder} flex items-start justify-between gap-2.5`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-bold opacity-90 uppercase tracking-wider">
                               {formatDayOfWeek(m.date)}
                             </span>
-                            <span className="text-sm font-extrabold tracking-tight">
+                            <span className="text-lg sm:text-xl font-extrabold tracking-tight">
                               {formatDateToDDMMYYYY(m.date)}
                             </span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${style.badgeBg} ${style.badgeText} ${style.badgeBorder}`}>
+                            <span className={`text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded border ${style.badgeBg} ${style.badgeText} ${style.badgeBorder}`}>
                               {style.name}
                             </span>
                           </div>
-                          <h3 className="font-extrabold text-sm sm:text-base mt-0.5 line-clamp-1">
+                          <h3 className="font-extrabold text-lg sm:text-xl mt-1.5 text-slate-900 leading-snug line-clamp-2">
                             {m.title || m.name || 'Thánh Lễ'}
                           </h3>
                         </div>
 
                         {/* Status badge */}
-                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                        <span className={`text-xs sm:text-sm font-bold px-3 py-1 rounded-full shrink-0 shadow-2xs ${
                           isApproved 
                             ? 'bg-emerald-600 text-white' 
                             : 'bg-amber-100 text-amber-900 border border-amber-300'
@@ -691,8 +817,8 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                         </span>
                       </div>
 
-                      {/* Song Items List for this Day */}
-                      <div className="p-3 flex-1 space-y-2 text-xs divide-y divide-stone-100">
+                      {/* Song Items List for this Day - ENLARGED TYPOGRAPHY */}
+                      <div className="p-3.5 sm:p-4 flex-1 space-y-3 divide-y divide-stone-100">
                         {m.program && m.program.length > 0 ? (
                           m.program.map((item, idx) => {
                             const pos = item.position;
@@ -702,22 +828,22 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             const organistName = item.organist || item.instrumentalist || item.accompanist;
 
                             return (
-                              <div key={item.id || idx} className="pt-2 first:pt-0 space-y-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                              <div key={item.id || idx} className="pt-2.5 first:pt-0 space-y-1.5">
+                                <div className="flex items-start justify-between gap-2.5">
+                                  <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                                    <span className={`text-xs sm:text-sm font-bold px-2.5 py-1 rounded-md border min-w-[76px] text-center ${badgeColor}`}>
                                       {item.positionLabel || getMassPositionLabel(pos)}
                                     </span>
                                   </div>
 
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-slate-900 line-clamp-1">
-                                      {item.title || <span className="text-stone-400 italic font-normal">Chưa chọn bài</span>}
+                                    <div className="font-extrabold text-base sm:text-lg text-slate-950 tracking-tight leading-snug line-clamp-2">
+                                      {item.title || <span className="text-stone-400 italic font-normal text-sm sm:text-base">Chưa chọn bài</span>}
                                     </div>
-                                    <div className="flex items-center gap-1 text-[11px] text-stone-500 font-medium">
+                                    <div className="flex flex-wrap items-center gap-2 text-sm sm:text-base text-stone-700 font-semibold mt-0.5">
                                       {item.composer && <span>{item.composer}</span>}
                                       {pageStr && (
-                                        <span className="bg-amber-100 text-amber-950 px-1 py-0 rounded text-[9px] font-bold">
+                                        <span className="bg-amber-100 text-amber-950 px-2 py-0.5 rounded text-xs sm:text-sm font-bold border border-amber-200">
                                           Tr. {pageStr}
                                         </span>
                                       )}
@@ -727,16 +853,16 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
                                 {/* Solo / Organist info badge */}
                                 {(soloName || organistName) && (
-                                  <div className="flex flex-wrap items-center gap-1.5 pl-6 text-[10px]">
+                                  <div className="flex flex-wrap items-center gap-2 pl-3 pt-0.5 text-xs sm:text-sm">
                                     {soloName && (
-                                      <span className="bg-purple-100 text-purple-950 font-bold px-1.5 py-0.2 rounded border border-purple-200 flex items-center gap-1">
-                                        <Mic className="w-2.5 h-2.5 text-purple-700" />
+                                      <span className="bg-purple-100 text-purple-950 font-bold px-2.5 py-1 rounded-md border border-purple-200 flex items-center gap-1.5">
+                                        <Mic className="w-3.5 h-3.5 text-purple-700" />
                                         <span>Solo: {soloName}</span>
                                       </span>
                                     )}
                                     {organistName && (
-                                      <span className="bg-sky-50 text-sky-950 font-medium px-1.5 py-0.2 rounded border border-sky-200 flex items-center gap-1">
-                                        <Volume2 className="w-2.5 h-2.5 text-sky-700" />
+                                      <span className="bg-sky-50 text-sky-950 font-semibold px-2.5 py-1 rounded-md border border-sky-200 flex items-center gap-1.5">
+                                        <Volume2 className="w-3.5 h-3.5 text-sky-700" />
                                         <span>Đàn: {organistName}</span>
                                       </span>
                                     )}
@@ -746,17 +872,17 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             );
                           })
                         ) : (
-                          <div className="py-4 text-center text-stone-400 italic text-xs">
+                          <div className="py-4 text-center text-stone-400 italic text-sm sm:text-base">
                             Chưa có bài hát nào trong ngày lễ này.
                           </div>
                         )}
                       </div>
 
                       {/* Day Action Buttons (Nút xóa nằm ngay trong ngày lễ, ko nằm ở bảng!) */}
-                      <div className="p-2.5 bg-stone-50 border-t border-stone-200">
+                      <div className="p-3 bg-stone-50 border-t border-stone-200">
                         {isConfirmingDeleteThisCard ? (
                           <div className="bg-rose-50 p-2.5 rounded-lg border border-rose-300 space-y-2 animate-in fade-in duration-150">
-                            <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                            <div className="text-xs sm:text-sm font-bold text-rose-900 flex items-center gap-1.5">
                               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                               <span>Xác nhận xóa ngày lễ {formatDateToDDMMYYYY(m.date)}?</span>
                             </div>
@@ -766,14 +892,14 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                                   onDeleteMass(m.id);
                                   setCardDeleteConfirmId(null);
                                 }}
-                                className="flex-1 min-h-[34px] bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-md shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                                className="flex-1 min-h-[36px] bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm rounded-md shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Xác Nhận Xóa</span>
                               </button>
                               <button
                                 onClick={() => setCardDeleteConfirmId(null)}
-                                className="min-h-[34px] px-3 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold text-xs rounded-md cursor-pointer"
+                                className="min-h-[36px] px-3 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold text-xs sm:text-sm rounded-md cursor-pointer"
                               >
                                 Hủy
                               </button>
@@ -784,16 +910,16 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             {/* Edit Button */}
                             <button
                               onClick={() => handleOpenEditModal(m)}
-                              className="flex-1 min-h-[36px] bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-lg px-2.5 py-1.5 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-all"
+                              className="flex-1 min-h-[38px] bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs sm:text-sm rounded-lg px-3 py-2 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-all"
                             >
-                              <Edit3 className="w-3.5 h-3.5 text-amber-300" />
+                              <Edit3 className="w-4 h-4 text-amber-300" />
                               <span>Sửa Chương Trình</span>
                             </button>
 
                             {/* Print / PDF Button */}
                             <button
                               onClick={() => onOpenPdfPrint(m)}
-                              className="min-h-[36px] min-w-[36px] bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                              className="min-h-[38px] min-w-[38px] bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg flex items-center justify-center cursor-pointer transition-all"
                               title="Xem & In PDF"
                             >
                               <Printer className="w-4 h-4 text-stone-700" />
@@ -802,7 +928,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             {/* Duplicate Button */}
                             <button
                               onClick={() => handleOpenDuplicate(m)}
-                              className="min-h-[36px] min-w-[36px] bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                              className="min-h-[38px] min-w-[38px] bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg flex items-center justify-center cursor-pointer transition-all"
                               title="Nhân bản sang Chúa Nhật kế"
                             >
                               <Copy className="w-4 h-4 text-stone-700" />
@@ -811,7 +937,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
                             {/* NÚT XÓA NẰM TRONG NGÀY (Theo đúng yêu cầu của người dùng) */}
                             <button
                               onClick={() => setCardDeleteConfirmId(m.id)}
-                              className="min-h-[36px] min-w-[36px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg flex items-center justify-center cursor-pointer transition-all"
+                              className="min-h-[38px] min-w-[38px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg flex items-center justify-center cursor-pointer transition-all"
                               title="Xóa ngày lễ này"
                             >
                               <Trash2 className="w-4 h-4 text-rose-600" />

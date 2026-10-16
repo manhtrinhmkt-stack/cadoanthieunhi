@@ -103,7 +103,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   };
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto">
+    <div className="flex-1 min-h-0 overflow-y-auto space-y-4 max-w-4xl w-full mx-auto pb-24 pr-1">
       {/* Status Notification Banner */}
       {statusMessage && (
         <div className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-semibold flex items-center justify-between gap-2 animate-in fade-in duration-150 ${

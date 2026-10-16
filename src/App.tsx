@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Cloud
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
 
 import { INITIAL_SONGS, INITIAL_MASSES, INITIAL_SHEETS } from './data/initialData';
@@ -36,6 +37,7 @@ import {
   logoutUser, 
   saveAppDataToFirestore, 
   subscribeToAppData,
+  forceReloadAppDataFromFirestore,
   emailToUsername 
 } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -167,7 +169,7 @@ export default function App() {
     };
   }, [currentUser]);
 
-  // Immediate Commit Helper to State & Cloud Firestore (Zero delay, No rollback on reload)
+  // Immediate Commit Helper to State & Cloud Firestore (Zero delay, Authoritative persistence)
   const commitAppData = async (newMasses: MassEvent[], newSongs: Song[], newSheets: SheetArchive[]) => {
     dataRef.current = { masses: newMasses, songs: newSongs, sheets: newSheets };
     setMasses(newMasses);
@@ -185,7 +187,33 @@ export default function App() {
       } catch (err) {
         console.error('[Data] Commit to Firestore failed:', err);
         setSyncStatus('ERROR');
+        throw err;
       }
+    }
+  };
+
+  // Direct manual authoritative reload from Cloud Firestore
+  const handleForceReloadCloud = async () => {
+    try {
+      setSyncStatus('SYNCING');
+      const data = await forceReloadAppDataFromFirestore();
+      if (data) {
+        dataRef.current = {
+          masses: data.masses || [],
+          songs: data.songs || [],
+          sheets: data.sheets || []
+        };
+        setMasses(data.masses || []);
+        setSongs(data.songs || []);
+        setSheets(data.sheets || []);
+        localStorage.setItem('cantus_so_tay_masses', JSON.stringify(data.masses || []));
+        localStorage.setItem('cantus_so_tay_songs', JSON.stringify(data.songs || []));
+        localStorage.setItem('cantus_so_tay_sheets', JSON.stringify(data.sheets || []));
+      }
+      setSyncStatus('SAVED');
+    } catch (e) {
+      console.error('[Sync] Force reload error:', e);
+      setSyncStatus('ERROR');
     }
   };
 
@@ -201,6 +229,9 @@ export default function App() {
       localStorage.removeItem('cantus_so_tay_masses');
       localStorage.removeItem('cantus_so_tay_songs');
       localStorage.removeItem('cantus_so_tay_sheets');
+      setMasses(INITIAL_MASSES);
+      setSongs(INITIAL_SONGS);
+      setSheets(INITIAL_SHEETS);
     }
   };
 
@@ -211,7 +242,7 @@ export default function App() {
   const [pdfPrintMass, setPdfPrintMass] = useState<MassEvent | null>(null);
 
   // SAVE MASS PROGRAM
-  const handleSaveMass = (updatedMass: MassEvent, newSongsToCreate?: Song[]) => {
+  const handleSaveMass = async (updatedMass: MassEvent, newSongsToCreate?: Song[]) => {
     const current = dataRef.current;
     let updatedSongs = [...current.songs];
     if (newSongsToCreate && newSongsToCreate.length > 0) {
@@ -227,18 +258,18 @@ export default function App() {
       ? current.masses.map((m, i) => (i === idx ? updatedMass : m))
       : [updatedMass, ...current.masses];
 
-    commitAppData(updatedMasses, updatedSongs, current.sheets);
+    await commitAppData(updatedMasses, updatedSongs, current.sheets);
   };
 
   // DELETE MASS (Immediately persisted to Firestore)
-  const handleDeleteMass = (id: string) => {
+  const handleDeleteMass = async (id: string) => {
     const current = dataRef.current;
     const updatedMasses = current.masses.filter(m => m.id !== id);
-    commitAppData(updatedMasses, current.songs, current.sheets);
+    await commitAppData(updatedMasses, current.songs, current.sheets);
   };
 
   // DUPLICATE MASS
-  const handleDuplicateMass = (source: MassEvent, newDate: string) => {
+  const handleDuplicateMass = async (source: MassEvent, newDate: string) => {
     const current = dataRef.current;
     const duplicated: MassEvent = {
       ...JSON.parse(JSON.stringify(source)),
@@ -248,27 +279,27 @@ export default function App() {
       status: 'DRAFT',
       createdAt: new Date().toISOString()
     };
-    commitAppData([duplicated, ...current.masses], current.songs, current.sheets);
+    await commitAppData([duplicated, ...current.masses], current.songs, current.sheets);
   };
 
   // SAVE / DELETE SONG
-  const handleSaveSong = (song: Song) => {
+  const handleSaveSong = async (song: Song) => {
     const current = dataRef.current;
     const idx = current.songs.findIndex(s => s.id === song.id);
     const updatedSongs = idx >= 0
       ? current.songs.map((s, i) => (i === idx ? song : s))
       : [song, ...current.songs];
-    commitAppData(current.masses, updatedSongs, current.sheets);
+    await commitAppData(current.masses, updatedSongs, current.sheets);
   };
 
-  const handleDeleteSong = (id: string) => {
+  const handleDeleteSong = async (id: string) => {
     const current = dataRef.current;
     const updatedSongs = current.songs.filter(s => s.id !== id);
-    commitAppData(current.masses, updatedSongs, current.sheets);
+    await commitAppData(current.masses, updatedSongs, current.sheets);
   };
 
   // SAVE / DELETE SHEET
-  const handleSaveSheet = (sheet: SheetArchive, newSongToCreate?: Song) => {
+  const handleSaveSheet = async (sheet: SheetArchive, newSongToCreate?: Song) => {
     const current = dataRef.current;
     let updatedSongs = [...current.songs];
     if (newSongToCreate) {
@@ -281,22 +312,22 @@ export default function App() {
     const updatedSheets = idx >= 0
       ? current.sheets.map((s, i) => (i === idx ? sheet : s))
       : [sheet, ...current.sheets];
-    commitAppData(current.masses, updatedSongs, updatedSheets);
+    await commitAppData(current.masses, updatedSongs, updatedSheets);
   };
 
-  const handleDeleteSheet = (id: string) => {
+  const handleDeleteSheet = async (id: string) => {
     const current = dataRef.current;
     const updatedSheets = current.sheets.filter(s => s.id !== id);
-    commitAppData(current.masses, current.songs, updatedSheets);
+    await commitAppData(current.masses, current.songs, updatedSheets);
   };
 
   // RESTORE FULL DATA
-  const handleRestoreData = (restored: { masses: MassEvent[]; songs: Song[]; sheets: SheetArchive[] }, mode: 'REPLACE' | 'MERGE') => {
+  const handleRestoreData = async (restored: { masses: MassEvent[]; songs: Song[]; sheets: SheetArchive[] }, mode: 'REPLACE' | 'MERGE') => {
     const current = dataRef.current;
     const newMasses = mode === 'REPLACE' ? (restored.masses || []) : [...(restored.masses || []), ...current.masses];
     const newSongs = mode === 'REPLACE' ? (restored.songs || []) : [...(restored.songs || []), ...current.songs];
     const newSheets = mode === 'REPLACE' ? (restored.sheets || []) : [...(restored.sheets || []), ...current.sheets];
-    commitAppData(newMasses, newSongs, newSheets);
+    await commitAppData(newMasses, newSongs, newSheets);
   };
 
   // 1. SHOW LOADING SCREEN WHILE VERIFYING SESSION
@@ -354,7 +385,7 @@ export default function App() {
   const confirmedMassesCount = masses.filter(m => m.status === 'APPROVED' || m.status === 'USED').length;
 
   return (
-    <div className="min-h-screen md:h-screen flex flex-col bg-stone-100/80 text-slate-900 font-sans antialiased selection:bg-amber-300 selection:text-slate-900 pb-28 md:pb-2 md:overflow-hidden">
+    <div className="h-screen flex flex-col bg-stone-100/80 text-slate-900 font-sans antialiased selection:bg-amber-300 selection:text-slate-900 overflow-hidden">
       
       {/* Compact Responsive Sacred Top Header Navigation */}
       <header className="shrink-0 bg-white border-b border-stone-200 shadow-2xs z-40 sticky top-0 md:static">
@@ -447,26 +478,34 @@ export default function App() {
 
             {/* Logged User Badge & Real-time Cloud Sync Status */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Cloud Sync Status Indicator */}
-              <div className="hidden sm:flex items-center">
+              {/* Cloud Sync Status Indicator & Manual Force Reload */}
+              <div className="flex items-center gap-1.5">
                 {syncStatus === 'SYNCING' && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl">
-                    <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
-                    <span>Đang lưu Cloud...</span>
+                  <span className="flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                    <span className="hidden sm:inline">Đang lưu Cloud...</span>
                   </span>
                 )}
                 {syncStatus === 'SAVED' && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-xl">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    <span>Đã lưu Cloud</span>
+                  <span className="flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-xl">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline">Đã lưu Cloud</span>
                   </span>
                 )}
                 {syncStatus === 'ERROR' && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-xl" title="Không thể lưu vào Firestore">
-                    <AlertCircle className="w-3 h-3 text-rose-600" />
-                    <span>Lỗi đồng bộ</span>
+                  <span className="flex items-center gap-1 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-xl" title="Không thể lưu vào Firestore">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span className="hidden sm:inline">Lỗi đồng bộ</span>
                   </span>
                 )}
+                
+                <button
+                  onClick={handleForceReloadCloud}
+                  title="Làm mới dữ liệu từ Cloud Firestore"
+                  className="p-1.5 text-stone-500 hover:text-indigo-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'SYNCING' ? 'animate-spin text-indigo-600' : ''}`} />
+                </button>
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2 bg-stone-100 border border-stone-200 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold text-stone-800">
@@ -499,15 +538,15 @@ export default function App() {
             <span>Bản in: <strong className="text-slate-900">{sheets.length}</strong></span>
           </div>
 
-          <div className="text-stone-500 font-medium text-[10px] sm:text-[11px] flex items-center gap-1">
+          <div className="text-stone-500 font-medium text-[11px] sm:text-xs flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span>Phiên 30 ngày &amp; Đồng bộ Cloud</span>
+            <span>Đồng bộ dữ liệu Cloud Firestore</span>
           </div>
         </div>
       </div>
 
-      {/* Main Workspace Area */}
-      <main className="flex-1 w-full max-w-[1680px] mx-auto px-2.5 sm:px-6 lg:px-8 py-2.5 sm:py-4 flex flex-col min-h-0 md:overflow-hidden">
+      {/* Main Workspace Area - No vertical page scroll */}
+      <main className="flex-1 w-full max-w-[1680px] mx-auto px-2 sm:px-6 lg:px-8 py-2 sm:py-3 flex flex-col min-h-0 overflow-hidden pb-14 md:pb-1">
         
         {/* TAB 1: Chương trình Thánh lễ */}
         {activeTab === 'MASSES' && (

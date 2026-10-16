@@ -5,6 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
   browserLocalPersistence,
+  browserSessionPersistence,
   setPersistence,
   updatePassword,
   reauthenticateWithCredential,
@@ -87,9 +88,20 @@ export function emailToUsername(email: string | null | undefined): string {
 // AUTHENTICATION HELPERS (CLIENT-SIDE FIREBASE WEB SDK)
 // -------------------------------------------------------------
 
-export async function loginWithUsername(username: string, password: string):Promise<{ username: string; displayName: string }> {
+export async function loginWithUsername(
+  username: string, 
+  password: string, 
+  rememberMe: boolean = true
+): Promise<{ username: string; displayName: string }> {
   const cleanUsername = username.trim().toLowerCase();
   const technicalEmail = usernameToEmail(cleanUsername);
+
+  // Set persistent session according to user's "Ghi nhớ đăng nhập" choice
+  try {
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+  } catch (persErr) {
+    console.warn('[Firebase Auth] Persistence configuration error:', persErr);
+  }
 
   const credential = await signInWithEmailAndPassword(auth, technicalEmail, password);
   const user = credential.user;
@@ -138,6 +150,26 @@ export async function loadAppDataFromFirestore(): Promise<{ masses?: any[]; song
   } catch (error: any) {
     console.error('[Firestore] Failed to load app data:', error);
     throw error;
+  }
+  return null;
+}
+
+// Direct authoritative server fetch bypassing any local client cache
+export async function forceReloadAppDataFromFirestore(): Promise<{ masses?: any[]; songs?: any[]; sheets?: any[] } | null> {
+  try {
+    const docRef = doc(db, 'app_data', APP_DATA_DOC);
+    const snap = await getDocFromServer(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        masses: Array.isArray(data?.masses) ? data.masses : [],
+        songs: Array.isArray(data?.songs) ? data.songs : [],
+        sheets: Array.isArray(data?.sheets) ? data.sheets : []
+      };
+    }
+  } catch (error: any) {
+    console.warn('[Firestore] forceReload from server warning, falling back to cached getDoc:', error);
+    return loadAppDataFromFirestore();
   }
   return null;
 }

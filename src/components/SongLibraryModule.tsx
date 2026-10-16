@@ -123,13 +123,13 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 flex flex-col min-h-0 h-full space-y-3">
       {/* Header & Controls */}
-      <div className="bg-white rounded-xl p-5 sm:p-6 border border-stone-200 shadow-2xs space-y-4">
+      <div className="shrink-0 bg-white rounded-xl p-4 sm:p-5 border border-stone-200 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Music className="w-5 h-5 text-slate-800" />
+              <Music className="w-5 h-5 text-indigo-700" />
               <span>Kho Bài Hát Thánh Ca ({songs.length} tác phẩm)</span>
             </h2>
             <p className="text-xs text-stone-500 font-medium mt-0.5">Lưu trữ danh sách bài hát, vị trí hát, tác giả và lịch sử hát trong phụng vụ.</p>
@@ -142,7 +142,7 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
               setNewComposer('');
               setShowAddModal(true);
             }}
-            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-4.5 py-2.5 rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0"
+            className="bg-indigo-800 hover:bg-indigo-900 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-amber-400" />
             <span>+ Thêm bài hát mới</span>
@@ -168,7 +168,7 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
             <select
               value={positionFilter}
               onChange={(e) => setPositionFilter(e.target.value)}
-              className="w-full bg-stone-50 px-3 py-2 rounded-md border border-stone-200 text-slate-900 font-bold focus:outline-none focus:border-indigo-500"
+              className="w-full bg-stone-50 px-3 py-2 rounded-md border border-stone-200 text-slate-900 font-semibold focus:outline-none focus:border-indigo-500"
             >
               <option value="ALL">Tất cả vị trí hát</option>
               <option value="NL">Nhập Lễ (NL)</option>
@@ -195,8 +195,8 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
         </div>
       </div>
 
-      {/* Mobile Card List View (Phones & Tablets) */}
-      <div className="md:hidden space-y-2.5">
+      {/* Mobile Card List View (Scrollable on phones & small tablets) */}
+      <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-0.5 pb-20">
         {filteredSongs.map(s => {
           const { actualCount, recentDate } = getSongUsageStats(s.title);
           const pos = s.defaultPosition || s.categories?.[0] || 'HL';
@@ -206,27 +206,27 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5 flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${getMassPositionBadgeColor(pos)}`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getMassPositionBadgeColor(pos)}`}>
                       {getMassPositionLabel(pos)}
                     </span>
                     {(s.storageCode || s.pageNumber) && (
-                      <span className="text-[10px] bg-indigo-50 text-indigo-900 border border-indigo-200 font-mono font-bold px-1.5 py-0.2 rounded">
+                      <span className="text-[10px] bg-indigo-50 text-indigo-900 border border-indigo-200 font-mono font-semibold px-1.5 py-0.2 rounded">
                         Tr. {s.storageCode || s.pageNumber}
                       </span>
                     )}
                   </div>
-                  <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{s.title}</h4>
-                  <p className="text-xs text-stone-500 font-medium">{s.composer}</p>
+                  <h4 className="font-black text-slate-950 text-sm sm:text-base line-clamp-1">{s.title}</h4>
+                  <p className="text-xs text-stone-600 font-medium">{s.composer}</p>
                 </div>
 
-                <span className="font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px] shrink-0">
+                <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-xs shrink-0">
                   {actualCount} lần
                 </span>
               </div>
 
               {/* Stats & Notes */}
-              <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1 border-t border-stone-100">
-                <span>Gần nhất: <strong className="text-stone-700">{recentDate}</strong></span>
+              <div className="flex items-center justify-between text-xs text-stone-500 pt-1 border-t border-stone-100">
+                <span>Gần nhất: <strong className="text-stone-700 font-semibold">{recentDate}</strong></span>
                 {s.note && <span className="italic text-stone-400 truncate max-w-[140px]">{s.note}</span>}
               </div>
 
@@ -234,7 +234,7 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
               <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-stone-100">
                 <button
                   onClick={() => setSelectedSongDetail(s)}
-                  className="min-h-[34px] px-2.5 bg-stone-100 hover:bg-stone-200 text-slate-900 font-bold text-xs rounded-md flex items-center gap-1 cursor-pointer"
+                  className="min-h-[34px] px-2.5 bg-stone-100 hover:bg-stone-200 text-slate-900 font-semibold text-xs rounded-md flex items-center gap-1 cursor-pointer"
                 >
                   <History className="w-3.5 h-3.5 text-indigo-700" />
                   <span>Lịch sử ({actualCount})</span>
@@ -275,11 +275,11 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
         )}
       </div>
 
-      {/* Desktop Song List Table View */}
-      <div className="hidden md:block bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Desktop Song List Table View (Smooth Scrollable Container with Sticky Table Header) */}
+      <div className="hidden md:flex flex-col flex-1 min-h-0 bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm text-slate-700 border-collapse">
-            <thead className="bg-stone-50/90 font-bold text-slate-900 border-b border-stone-200">
+            <thead className="sticky top-0 bg-stone-50/95 backdrop-blur-xs z-10 font-bold text-slate-900 border-b border-stone-200 shadow-2xs">
               <tr>
                 <th className="px-4 py-3.5 sm:px-5 sm:py-4">Vị Trí Mẫu</th>
                 <th className="px-4 py-3.5 sm:px-5 sm:py-4">Tên Bài Hát & Nhạc Sĩ</th>
@@ -304,8 +304,8 @@ export const SongLibraryModule: React.FC<SongLibraryModuleProps> = ({
                     </td>
 
                     <td className="px-4 py-3.5 sm:px-5 sm:py-4">
-                      <strong className="text-slate-900 block font-bold text-xs sm:text-sm">{s.title}</strong>
-                      <span className="text-stone-500 font-medium text-xs">{s.composer}</span>
+                      <strong className="text-slate-950 block font-black text-sm sm:text-base tracking-tight">{s.title}</strong>
+                      <span className="text-stone-600 font-medium text-xs sm:text-sm">{s.composer}</span>
                     </td>
 
                     <td className="px-4 py-3.5 sm:px-5 sm:py-4 font-mono font-bold text-indigo-900 text-xs">
