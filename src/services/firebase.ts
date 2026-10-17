@@ -85,8 +85,44 @@ export function emailToUsername(email: string | null | undefined): string {
 }
 
 // -------------------------------------------------------------
-// AUTHENTICATION HELPERS (CLIENT-SIDE FIREBASE WEB SDK)
+// AUTHENTICATION HELPERS & PERSISTENT REMEMBER-ME STORAGE
 // -------------------------------------------------------------
+
+export const SESSION_STORAGE_KEY = 'cantus_auth_session';
+export const REMEMBERED_CRED_KEY = 'cantus_auth_remembered_cred';
+
+function encodeCred(data: { u: string; p: string }): string {
+  try {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  } catch {
+    return btoa(JSON.stringify(data));
+  }
+}
+
+function decodeCred(str: string): { u: string; p: string } | null {
+  try {
+    const json = decodeURIComponent(escape(atob(str)));
+    return JSON.parse(json);
+  } catch {
+    try {
+      return JSON.parse(atob(str));
+    } catch {
+      return null;
+    }
+  }
+}
+
+export function getSavedSession(): { username: string; displayName: string; rememberMe: boolean } | null {
+  try {
+    const local = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (local) return JSON.parse(local);
+    const session = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (session) return JSON.parse(session);
+  } catch (e) {
+    console.warn('[Firebase Auth] Error reading saved session:', e);
+  }
+  return null;
+}
 
 export async function loginWithUsername(
   username: string, 
@@ -106,13 +142,83 @@ export async function loginWithUsername(
   const credential = await signInWithEmailAndPassword(auth, technicalEmail, password);
   const user = credential.user;
 
-  return {
+  const resultUser = {
     username: cleanUsername,
     displayName: cleanUsername === 'admin' ? 'Ban Quản Trị' : (user.displayName || cleanUsername)
   };
+
+  const sessionData = {
+    username: cleanUsername,
+    displayName: resultUser.displayName,
+    rememberMe,
+    savedAt: Date.now()
+  };
+
+  if (rememberMe) {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+    localStorage.setItem(REMEMBERED_CRED_KEY, encodeCred({ u: cleanUsername, p: password }));
+    localStorage.setItem('cantus_saved_username', cleanUsername);
+    localStorage.setItem('cantus_remember_me', 'true');
+  } else {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.removeItem(REMEMBERED_CRED_KEY);
+    localStorage.setItem('cantus_remember_me', 'false');
+  }
+
+  return resultUser;
+}
+
+export async function tryAutoLogin(): Promise<{ username: string; displayName: string } | null> {
+  // 1. If Firebase Auth already has active currentUser (e.g. from IndexedDB)
+  if (auth.currentUser && auth.currentUser.email) {
+    const cleanUsername = emailToUsername(auth.currentUser.email);
+    return {
+      username: cleanUsername,
+      displayName: cleanUsername === 'admin' ? 'Ban Quản Trị' : (auth.currentUser.displayName || cleanUsername)
+    };
+  }
+
+  // 2. Check if remembered credentials exist in localStorage (user checked "Ghi nhớ đăng nhập")
+  const savedCredStr = localStorage.getItem(REMEMBERED_CRED_KEY);
+  if (savedCredStr) {
+    const cred = decodeCred(savedCredStr);
+    if (cred && cred.u && cred.p) {
+      try {
+        console.log('[Firebase Auth] Khôi phục phiên đăng nhập từ ghi nhớ...');
+        return await loginWithUsername(cred.u, cred.p, true);
+      } catch (err: any) {
+        console.warn('[Firebase Auth] Tự động đăng nhập từ bộ nhớ thất bại:', err);
+        const code = err?.code || '';
+        // If password was changed or user no longer valid, clear stale credentials
+        if (code === 'auth/wrong-password' || code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+          localStorage.removeItem(REMEMBERED_CRED_KEY);
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+      }
+    }
+  }
+
+  // 3. Fallback to saved session representation if exists
+  const saved = getSavedSession();
+  if (saved && saved.rememberMe) {
+    return {
+      username: saved.username,
+      displayName: saved.displayName
+    };
+  }
+
+  return null;
 }
 
 export async function logoutUser(): Promise<void> {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.removeItem(REMEMBERED_CRED_KEY);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[Auth] Error clearing storage on logout:', e);
+  }
   await signOut(auth);
 }
 
@@ -126,6 +232,15 @@ export async function changeCurrentUserPassword(currentPassword: string, newPass
   const credential = EmailAuthProvider.credential(user.email, currentPassword);
   await reauthenticateWithCredential(user, credential);
   await updatePassword(user, newPassword);
+
+  // If credentials were remembered, update with new password so auto-login continues working
+  const savedCredStr = localStorage.getItem(REMEMBERED_CRED_KEY);
+  if (savedCredStr) {
+    const cred = decodeCred(savedCredStr);
+    if (cred) {
+      localStorage.setItem(REMEMBERED_CRED_KEY, encodeCred({ u: cred.u, p: newPassword }));
+    }
+  }
 }
 
 // -------------------------------------------------------------

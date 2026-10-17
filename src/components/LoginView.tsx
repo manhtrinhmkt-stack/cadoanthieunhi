@@ -12,7 +12,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('cantus_remember_me') !== 'false';
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -27,11 +29,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setErrorMsg(null);
 
     try {
-      if (rememberMe) {
-        localStorage.setItem('cantus_saved_username', username.trim());
-      } else {
-        localStorage.removeItem('cantus_saved_username');
-      }
       const user = await loginWithUsername(username, password, rememberMe);
       onLoginSuccess(user);
     } catch (err: any) {
@@ -93,7 +90,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
           {/* Username Field */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider">
+            <label htmlFor="login_username" className="block text-xs font-bold text-stone-700 uppercase tracking-wider">
               Tên đăng nhập
             </label>
             <div className="relative">
@@ -101,6 +98,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <User className="w-4 h-4" />
               </div>
               <input
+                id="login_username"
+                name="username"
                 type="text"
                 required
                 autoComplete="username"
@@ -115,7 +114,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           {/* Password Field */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider">
+              <label htmlFor="login_password" className="block text-xs font-bold text-stone-700 uppercase tracking-wider">
                 Mật khẩu
               </label>
             </div>
@@ -124,6 +123,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <Lock className="w-4 h-4" />
               </div>
               <input
+                id="login_password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 autoComplete="current-password"
@@ -151,8 +152,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 text-indigo-700 border-stone-300 rounded focus:ring-indigo-600 focus:ring-offset-0 cursor-pointer accent-indigo-700"
               />
-              <span className="text-xs sm:text-sm font-semibold text-stone-700">
+              <span className="text-xs sm:text-sm font-bold text-indigo-950">
                 Ghi nhớ đăng nhập
+              </span>
+              <span className="text-[11px] text-stone-500 hidden sm:inline">
+                (Tự động vào thẳng ứng dụng lần sau)
               </span>
             </label>
           </div>

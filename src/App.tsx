@@ -38,7 +38,8 @@ import {
   saveAppDataToFirestore, 
   subscribeToAppData,
   forceReloadAppDataFromFirestore,
-  emailToUsername 
+  emailToUsername,
+  tryAutoLogin
 } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -71,24 +72,51 @@ export default function App() {
     dataRef.current = { masses, songs, sheets };
   }, [masses, songs, sheets]);
 
-  // Check Session on App Launch (Persistent Firebase Auth Session)
+  // Check Session on App Launch (Persistent Firebase Auth Session with Auto-Restore)
   useEffect(() => {
+    let isMounted = true;
     setIsCheckingAuth(true);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!isMounted) return;
+
       if (firebaseUser) {
         const username = emailToUsername(firebaseUser.email);
         setCurrentUser({
           username,
           displayName: username === 'admin' ? 'Ban Quản Trị' : (firebaseUser.displayName || username)
         });
+        setIsCheckingAuth(false);
       } else {
-        setCurrentUser(null);
-        setIsCloudSynced(false);
+        // If Firebase Auth returns null (initial load before restore or iframe partitioned storage),
+        // check if user enabled "Ghi nhớ đăng nhập" and attempt automatic background restoration!
+        try {
+          const autoUser = await tryAutoLogin();
+          if (!isMounted) return;
+          if (autoUser) {
+            setCurrentUser(autoUser);
+          } else {
+            setCurrentUser(null);
+            setIsCloudSynced(false);
+          }
+        } catch (autoErr) {
+          console.warn('[Auth] Auto-restore session error:', autoErr);
+          if (isMounted) {
+            setCurrentUser(null);
+            setIsCloudSynced(false);
+          }
+        } finally {
+          if (isMounted) {
+            setIsCheckingAuth(false);
+          }
+        }
       }
-      setIsCheckingAuth(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   // Real-Time Cloud Firestore Sync (Authoritative Multi-Device Live Sync)
@@ -341,7 +369,7 @@ export default function App() {
           <div className="space-y-1">
             <h2 className="text-lg font-black text-slate-900 font-serif">CANTUS</h2>
             <p className="text-xs font-semibold text-stone-500 uppercase tracking-widest">
-              Đang xác thực phiên đăng nhập...
+              Đang xác thực &amp; khôi phục phiên làm việc...
             </p>
           </div>
           <div className="w-6 h-6 border-2 border-indigo-700 border-t-transparent rounded-full animate-spin mx-auto" />
