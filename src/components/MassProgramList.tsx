@@ -616,66 +616,77 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
       </aside>
 
       {/* MAIN WORKSPACE CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 w-full min-h-0 h-full overflow-hidden space-y-2">
+      <main className="flex-1 flex flex-col min-w-0 w-full min-h-0 h-full overflow-hidden space-y-1 sm:space-y-2">
         
-        {/* UNIVERSAL TOP SCOPE & ACTIONS BAR */}
-        <div className="bg-white rounded-xl border border-stone-200 p-2 sm:p-2.5 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
+        {/* UNIVERSAL TOP SCOPE & ACTIONS BAR - Ultra compact single row on mobile */}
+        <div className="bg-white rounded-xl border border-stone-200 p-1 sm:p-2.5 shadow-2xs flex items-center justify-between gap-1 sm:gap-2.5 shrink-0">
           
           {/* Time Scope Tabs: UPCOMING (Ẩn các ngày đã qua) vs ARCHIVE (Mục Lưu Trữ) */}
-          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200/80">
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-stone-100 p-0.5 sm:p-1 rounded-xl border border-stone-200/80">
             <button
               onClick={() => setTimeScope('UPCOMING')}
-              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2 sm:px-3.5 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                 timeScope === 'UPCOMING'
                   ? 'bg-indigo-700 text-white shadow-2xs'
                   : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
               }`}
             >
-              <Calendar className="w-4 h-4 text-amber-300" />
-              <span>Lịch Sắp Tới</span>
-              <span className={`text-xs px-2 py-0.2 rounded-full font-extrabold ${timeScope === 'UPCOMING' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+              <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300 shrink-0" />
+              <span>Sắp Tới</span>
+              <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.2 rounded-full font-extrabold ${timeScope === 'UPCOMING' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
                 {upcomingCount}
               </span>
             </button>
 
             <button
               onClick={() => setTimeScope('ARCHIVE')}
-              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2 sm:px-3.5 py-1 sm:py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                 timeScope === 'ARCHIVE'
                   ? 'bg-amber-600 text-white shadow-2xs'
                   : 'text-stone-700 hover:text-slate-900 hover:bg-stone-200/70'
               }`}
               title="Mục lưu trữ để tra cứu và tìm kiếm các ngày lễ đã qua"
             >
-              <FolderArchive className="w-4 h-4 text-amber-200" />
-              <span>Mục Lưu Trữ</span>
-              <span className={`text-xs px-2 py-0.2 rounded-full font-extrabold ${timeScope === 'ARCHIVE' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
+              <FolderArchive className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200 shrink-0" />
+              <span>Lưu Trữ</span>
+              <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.2 rounded-full font-extrabold ${timeScope === 'ARCHIVE' ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'}`}>
                 {archivedCount}
               </span>
             </button>
 
             {timeScope === 'ALL' && (
-              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-1.5 rounded-lg">
+              <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-1 rounded-lg">
                 Tất cả ({masses.length})
               </span>
             )}
           </div>
 
-          {/* Right Side: Quick Actions (+ Chúa Nhật Kế, + Thêm Lễ) */}
-          <div className="flex items-center justify-between sm:justify-end gap-1.5 flex-wrap">
+          {/* Right Side: Quick Actions (Excel, Lọc, + Chúa Nhật Kế, + Thêm Lễ) */}
+          <div className="flex items-center justify-end gap-1 sm:gap-1.5 shrink-0">
+            {/* Excel Export Button */}
+            <button
+              onClick={handleExportMatrixExcel}
+              className="p-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition-all min-h-[30px]"
+              title="Xuất bảng ma trận ra tập tin Excel"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-100" />
+              <span className="hidden md:inline">Xuất Excel</span>
+            </button>
+
             {/* Mobile Filter Toggle Button */}
             <button
               onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-              className="lg:hidden px-2.5 py-1.5 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
+              className="lg:hidden px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-800 font-bold text-xs flex items-center gap-1 cursor-pointer min-h-[30px]"
+              title="Đóng / mở bộ lọc nâng cao"
             >
               <Filter className="w-3.5 h-3.5 text-indigo-700" />
-              <span>{isMobileSidebarOpen ? 'Đóng Lọc' : 'Bộ Lọc'}</span>
+              <span className="hidden xs:inline">{isMobileSidebarOpen ? 'Đóng Lọc' : 'Bộ Lọc'}</span>
             </button>
 
             {/* Quick Create Sunday Mass button */}
             <button
               onClick={handleAutoCreateSunday}
-              className="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition-all"
+              className="p-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition-all min-h-[30px]"
               title="Tự động tính ngày Chúa Nhật kế tiếp và tạo khung bài hát chuẩn"
             >
               <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
@@ -685,7 +696,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
             {/* Quick Add Custom Mass button */}
             <button
               onClick={() => handleOpenEditModal(null)}
-              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white shadow-2xs cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white shadow-2xs cursor-pointer min-h-[30px] min-w-[30px] flex items-center justify-center"
               title="Thêm chương trình lễ mới"
             >
               <Plus className="w-4 h-4 text-amber-400" />
@@ -693,80 +704,58 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
           </div>
         </div>
 
-        {/* TIME SCOPE CONTEXT BANNERS (ONLY WHEN ARCHIVE MODE IS ACTIVE) */}
+        {/* TIME SCOPE CONTEXT BANNERS (COMPACT ARCHIVE SEARCH & FILTER STRIP) */}
         {timeScope === 'ARCHIVE' && (
-          /* DEDICATED ARCHIVE HEADER & SEARCH PANEL */
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50/80 border border-amber-300/80 rounded-xl p-3 sm:p-4 shadow-2xs space-y-3 shrink-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                  <FolderArchive className="w-5 h-5 text-amber-100" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <span>Mục Lưu Trữ Thánh Lễ</span>
-                    <span className="text-xs bg-amber-200/80 text-amber-950 font-bold px-2 py-0.5 rounded-full">
-                      {filteredMasses.length} / {archivedCount} ngày đã qua
-                    </span>
-                  </h3>
-                  <p className="text-xs text-stone-600 font-medium">
-                    Tra cứu và tìm kiếm các bài hát, ca viên solo, ngày lễ đã cử hành trước đây
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setTimeScope('UPCOMING')}
-                className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shadow-2xs transition-colors"
-              >
-                <span>← Trở lại Lịch Sắp Tới</span>
-              </button>
+          <div className="bg-amber-50/90 border border-amber-300/80 rounded-xl px-2 py-1.5 shadow-2xs flex items-center gap-2 shrink-0">
+            {/* Desktop badge */}
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0 text-xs font-extrabold text-amber-950">
+              <FolderArchive className="w-4 h-4 text-amber-700" />
+              <span>Kho Lưu Trữ:</span>
+              <span className="bg-amber-200/80 text-amber-950 text-[11px] px-2 py-0.2 rounded-full font-bold">
+                {filteredMasses.length} / {archivedCount} lễ
+              </span>
             </div>
 
-            {/* Quick Search inside Archive */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-700/60" />
               <input
                 type="text"
                 value={filterSearch}
                 onChange={(e) => setFilterSearch(e.target.value)}
-                placeholder="Tìm kiếm trong kho lưu trữ (tên bài hát, nhạc sĩ, solo, tên ngày lễ, ngày cử hành...)"
-                className="w-full bg-white pl-9 pr-8 py-2.5 rounded-xl border border-amber-300 text-slate-900 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 shadow-2xs"
+                placeholder="Tìm bài hát, nhạc sĩ, solo, tên lễ đã qua..."
+                className="w-full bg-white pl-8 pr-7 py-1 rounded-lg border border-amber-300 text-slate-900 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-2xs"
               />
               {filterSearch && (
                 <button
                   onClick={() => setFilterSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer p-0.5"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer p-0.5"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               )}
             </div>
 
-            {/* Year Quick Filter Pills inside Archive */}
+            {/* Quick Year Filter Dropdown inside Archive */}
             {years.length > 1 && (
-              <div className="flex flex-wrap items-center gap-1.5 text-xs pt-0.5">
-                <span className="font-bold text-stone-700 mr-1">Lọc năm:</span>
-                <button
-                  onClick={() => { setViewMode('ALL'); setSelectedYear('ALL'); }}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    viewMode === 'ALL' ? 'bg-amber-700 text-white' : 'bg-white text-stone-700 border border-stone-200 hover:bg-amber-100'
-                  }`}
-                >
-                  Tất cả các năm ({archivedCount})
-                </button>
+              <select
+                value={viewMode === 'THEO_NAM' ? selectedYear : 'ALL'}
+                onChange={(e) => {
+                  if (e.target.value === 'ALL') {
+                    setViewMode('ALL');
+                    setSelectedYear('ALL');
+                  } else {
+                    setViewMode('THEO_NAM');
+                    setSelectedYear(e.target.value);
+                  }
+                }}
+                className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-950 focus:outline-none shrink-0"
+              >
+                <option value="ALL">Tất cả năm</option>
                 {years.map(y => (
-                  <button
-                    key={y}
-                    onClick={() => { setViewMode('THEO_NAM'); setSelectedYear(y); }}
-                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                      viewMode === 'THEO_NAM' && selectedYear === y ? 'bg-amber-700 text-white' : 'bg-white text-stone-700 border border-stone-200 hover:bg-amber-100'
-                    }`}
-                  >
-                    Năm {y}
-                  </button>
+                  <option key={y} value={y}>Năm {y}</option>
                 ))}
-              </div>
+              </select>
             )}
           </div>
         )}
@@ -970,7 +959,7 @@ export const MassProgramList: React.FC<MassProgramListProps> = ({
 
         {/* VIEW 2: EXCEL MATRIX VIEW (MA TRẬN LƯỚI NGANG) */}
         {displayMode === 'MATRIX' && (
-          <div className="flex-1 flex flex-col min-w-0 w-full min-h-0 md:h-full md:overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 w-full min-h-0 h-full overflow-hidden">
             <MatrixScheduleView
               masses={filteredMasses}
               songs={songs}

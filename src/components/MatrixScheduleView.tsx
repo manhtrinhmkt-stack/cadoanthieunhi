@@ -257,21 +257,27 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 space-y-2 overflow-hidden">
+    <div className="flex-1 flex flex-col h-full min-h-0 space-y-1 sm:space-y-2 overflow-hidden">
       
-      {/* Top Helper & Controls Bar */}
-      <div className="flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-stone-200 shadow-2xs shrink-0 text-xs font-semibold text-stone-700">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="font-extrabold text-slate-900">Bảng Ma Trận Thánh Ca</span>
-          <span className="text-stone-400 hidden sm:inline">• Bấm vào ô để sửa bài</span>
+      {/* Top Helper & Controls Bar - Shown on desktop (on mobile, actions are in universal header) */}
+      <div className="hidden sm:flex items-center justify-between gap-1.5 bg-white px-2 sm:px-3 py-1 sm:py-2 rounded-xl border border-stone-200 shadow-2xs shrink-0 text-xs font-semibold text-stone-700">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+          <span className="font-black text-slate-900 text-xs sm:text-sm truncate">Ma Trận Thánh Ca</span>
+          <span className="text-stone-400 hidden md:inline">• Bấm vào ô để sửa bài</span>
+          <span className="text-[10px] sm:text-xs text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold truncate">
+            {filteredMasses.length} Ngày
+          </span>
+          <span className="sm:hidden text-[10px] text-stone-500 font-medium">
+            (Vuốt 4 chiều)
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 ml-auto">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Excel Export */}
           <button
             onClick={handleExportMatrixExcel}
-            className="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition-all"
+            className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition-all min-h-[28px]"
             title="Xuất tập tin Excel"
           >
             <Download className="w-3.5 h-3.5" />
@@ -280,28 +286,15 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
         </div>
       </div>
 
-      {/* Mobile Horizontal Scroll Hint Indicator */}
-      <div className="sm:hidden flex items-center justify-between bg-amber-50/90 border border-amber-200/80 px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-900 shrink-0">
-        <span>👉 Vuốt ngang bảng để xem tất cả các ngày lễ</span>
-        <span className="font-extrabold bg-amber-200/80 text-amber-950 px-2 py-0.5 rounded text-[11px]">
-          {filteredMasses.length} Ngày
-        </span>
-      </div>
-
-      {/* EXCEL MATRIX SPREADSHEET GRID - HORIZONTAL SCROLL ONLY, NO VERTICAL SCROLL */}
+      {/* EXCEL MATRIX SPREADSHEET GRID - FULL 2D SCROLL & COMPACT VIEWPORT ON ALL SCREENS */}
       <div 
-        onWheel={(e) => {
-          if (e.deltaY !== 0 && !e.deltaX) {
-            e.currentTarget.scrollLeft += e.deltaY;
-          }
-        }}
-        className="flex-1 min-h-0 bg-white rounded-xl border border-stone-300 shadow-2xs overflow-x-auto overflow-y-hidden flex flex-col"
+        className="flex-1 min-h-0 bg-white rounded-xl border border-stone-300 shadow-2xs overflow-x-auto overflow-y-auto flex flex-col"
       >
-        <table className="w-full h-full border-collapse select-none">
+        <table className="w-full border-collapse select-none">
           <thead>
             {/* Row 1: Ngày (Dates) - Sticky Top & Colored according to Liturgical Season */}
             <tr className="bg-stone-100 text-slate-900 border-b border-stone-300">
-              <th className="sticky top-0 left-0 z-40 bg-stone-200 border-r border-b border-stone-300 px-3 py-2 font-extrabold text-slate-900 text-center min-w-[110px] sm:min-w-[130px] shadow-xs text-xs sm:text-sm">
+              <th className="sticky top-0 left-0 z-40 bg-stone-200 border-r border-b border-stone-300 px-1.5 py-1 sm:px-2.5 sm:py-1.5 font-black text-slate-900 text-center min-w-[80px] sm:min-w-[110px] shadow-xs text-xs sm:text-sm">
                 Ngày
               </th>
               {filteredMasses.map(m => {
@@ -309,38 +302,38 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
                 return (
                   <th
                     key={m.id}
-                    className={`sticky top-0 z-30 px-3 py-2 font-extrabold text-center min-w-[180px] sm:min-w-[210px] ${style.headerBg} ${style.headerHover} ${style.headerText} cursor-pointer transition-colors border-r border-b ${style.headerBorder}`}
+                    className={`sticky top-0 z-30 px-2 py-1 sm:px-2.5 sm:py-1.5 font-black text-center min-w-[150px] sm:min-w-[190px] ${style.headerBg} ${style.headerHover} ${style.headerText} cursor-pointer transition-colors border-r border-b ${style.headerBorder}`}
                     onClick={() => onOpenEditDetails(m)}
                     title={`Xem / sửa / xóa toàn bộ lễ ngày ${formatDateToDDMMYYYY(m.date)}`}
                   >
-                    <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm">
+                    <div className="flex items-center justify-center gap-1 sm:gap-1.5 text-xs sm:text-sm">
                       <span className="font-black tracking-tight">{formatDateToDDMMYYYY(m.date)}</span>
-                      <Edit3 className="w-3.5 h-3.5 opacity-75 hover:opacity-100" />
+                      <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-75 hover:opacity-100" />
                     </div>
                   </th>
                 );
               })}
             </tr>
 
-            {/* Row 2: Mùa & Tên lễ - Sticky Top Row 2 with 100% Opaque Solid Background */}
-            <tr className="bg-white border-b border-stone-300 divide-x divide-stone-200">
-              <th className="sticky top-[38px] left-0 z-40 bg-stone-200 border-r border-b border-stone-300 px-3 py-1.5 font-bold text-slate-900 text-center shadow-xs text-xs">
-                Mùa &amp; Tên lễ
+            {/* Row 2: Mùa & Tên lễ - Sticky Top Row 2 with Clear Bottom Divider Line */}
+            <tr className="bg-white border-b-2 border-stone-400 divide-x divide-stone-200">
+              <th className="sticky top-[32px] sm:top-[36px] left-0 z-40 bg-stone-200 border-r border-b-2 border-stone-400 shadow-[inset_0_-2px_0_#78716c] px-1.5 py-0.5 sm:px-2.5 sm:py-1 font-bold text-slate-900 text-center shadow-xs text-[11px] sm:text-xs min-w-[80px] sm:min-w-[110px]">
+                Mùa &amp; Tên
               </th>
               {filteredMasses.map(m => {
                 const style = getLiturgicalHeaderStyle(m.liturgicalSeason || m.season);
                 return (
                   <td
                     key={m.id}
-                    className={`sticky top-[38px] z-30 bg-white px-3 py-1.5 text-center hover:bg-stone-50 cursor-pointer transition-colors border-r border-b ${style.headerBorder}`}
+                    className="sticky top-[32px] sm:top-[36px] z-30 bg-white px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-center hover:bg-stone-50 cursor-pointer transition-colors border-r border-b-2 border-stone-400 shadow-[inset_0_-2px_0_#78716c] min-w-[150px] sm:min-w-[190px]"
                     onClick={() => handleCellClick(m, undefined, 'FEAST_NAME')}
                   >
                     <div className="space-y-0.5">
-                      <span className={`inline-block px-2 py-0.5 rounded font-bold border ${style.badgeBg} ${style.badgeText} ${style.badgeBorder} text-[10px] sm:text-xs`}>
+                      <span className={`inline-block px-1.5 py-0.2 sm:px-2 sm:py-0.2 rounded font-bold border ${style.badgeBg} ${style.badgeText} ${style.badgeBorder} text-[9px] sm:text-[11px]`}>
                         {style.name}
                       </span>
-                      <div className="font-extrabold text-slate-900 line-clamp-1 leading-snug text-xs">
-                        {m.title || m.name || <span className="text-stone-400 italic font-normal text-xs">+ Tên lễ...</span>}
+                      <div className="font-extrabold text-slate-900 line-clamp-1 leading-tight text-[11px] sm:text-xs">
+                        {m.title || m.name || <span className="text-stone-400 italic font-normal text-[11px] sm:text-xs">+ Tên lễ...</span>}
                       </div>
                     </div>
                   </td>
@@ -351,41 +344,53 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
 
           <tbody className="divide-y divide-stone-200">
             {/* Loop over positions: Nhập lễ, Đáp ca, Alleluia, Dâng lễ, Hiệp lễ, Kết lễ */}
-            {rowsConfig.map(({ pos, label, bgClass, textClass }) => (
-              <tr key={pos} className={`${bgClass} hover:bg-stone-100/60 divide-x divide-stone-200 transition-colors`}>
-                
-                {/* Sticky Left Column for Position Label - 100% Opaque Solid Background */}
-                <td className="sticky left-0 z-20 bg-stone-100 font-extrabold text-slate-900 text-center border-r border-stone-300 px-3 py-2 shadow-2xs text-xs sm:text-sm">
-                  {label}
-                </td>
+            {rowsConfig.map(({ pos, label, bgClass, textClass }, rowIdx) => {
+              const isFirstRow = rowIdx === 0; // Nhập lễ - dòng kẻ phân cách rõ ràng từ Mùa lễ
+              const isLastRow = rowIdx === rowsConfig.length - 1; // Kết lễ - hàng cuối cùng
+              return (
+                <tr 
+                  key={pos} 
+                  className={`${bgClass} hover:bg-stone-100/60 divide-x divide-stone-200 transition-colors ${
+                    isFirstRow ? 'border-t-2 border-stone-400' : ''
+                  } ${isLastRow ? 'border-b-2 border-stone-300' : ''}`}
+                >
+                  
+                  {/* Sticky Left Column for Position Label - 100% Opaque Solid Background */}
+                  <td className={`sticky left-0 z-20 bg-stone-100 font-black text-slate-900 text-center border-r border-stone-300 px-1.5 py-1 sm:px-2.5 sm:py-1.5 shadow-2xs text-xs sm:text-sm min-w-[80px] sm:min-w-[110px] ${
+                    isFirstRow ? 'border-t-2 border-stone-400' : ''
+                  }`}>
+                    <span className="tracking-tight">{label}</span>
+                  </td>
 
-                {filteredMasses.map(m => {
-                  const items = getItemsByPos(m, pos);
-                  const cellPadding = 'px-3 py-1.5 sm:px-3 sm:py-2';
+                  {filteredMasses.map(m => {
+                    const items = getItemsByPos(m, pos);
+                    const cellPadding = 'px-1.5 py-1 sm:px-2 sm:py-1.5';
 
-                  return (
-                    <td
-                      key={m.id}
-                      className={`${cellPadding} text-center cursor-pointer hover:bg-amber-50/70 transition-colors`}
-                      onClick={() => handleCellClick(m, pos, 'TITLE')}
-                    >
+                    return (
+                      <td
+                        key={m.id}
+                        className={`${cellPadding} text-center cursor-pointer hover:bg-amber-50/70 transition-colors min-w-[150px] sm:min-w-[190px] ${
+                          isFirstRow ? 'border-t-2 border-stone-400' : ''
+                        }`}
+                        onClick={() => handleCellClick(m, pos, 'TITLE')}
+                      >
                       {items.length > 0 ? (
-                        <div className="space-y-1.5">
+                        <div className="space-y-0.5">
                           {items.map((item, idx) => {
                             const pageStr = item.key || item.pageNumber || '';
                             const soloName = item.soloSinger || item.soloist;
                             const organistName = item.organist || item.instrumentalist || item.accompanist;
 
                             return (
-                              <div key={item.id || idx} className="space-y-1 border-b border-stone-200/50 pb-1.5 last:border-b-0 last:pb-0">
-                                <div className="font-black text-slate-950 leading-snug line-clamp-2 text-sm sm:text-base tracking-tight">
+                              <div key={item.id || idx} className="space-y-0.5 border-b border-stone-200/50 pb-0.5 last:border-b-0 last:pb-0">
+                                <div className="font-black text-slate-950 leading-snug line-clamp-2 text-xs sm:text-sm tracking-tight">
                                   {items.length > 1 ? `${idx + 1}. ${item.title}` : item.title}
                                 </div>
 
-                                <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs text-stone-600">
+                                <div className="flex flex-wrap items-center justify-center gap-1 text-[10px] sm:text-[11px] text-stone-600">
                                   {item.composer && <span className="font-semibold text-stone-700">{item.composer}</span>}
                                   {pageStr && (
-                                    <span className="bg-amber-100 text-amber-950 font-bold px-2 py-0.5 rounded text-xs border border-amber-200">
+                                    <span className="bg-amber-100 text-amber-950 font-bold px-1.5 py-0.2 rounded text-[10px] sm:text-[11px] border border-amber-200">
                                       Tr. {pageStr}
                                     </span>
                                   )}
@@ -393,15 +398,15 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
 
                                 {/* Solo & Organist info directly inside slot */}
                                 {(soloName || organistName) && (
-                                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
+                                  <div className="flex flex-wrap items-center justify-center gap-1 pt-0.5">
                                     {soloName && (
-                                      <span className="bg-purple-100 text-purple-950 font-bold px-2 py-0.5 rounded text-xs border border-purple-200">
-                                        🎤 Solo: {soloName}
+                                      <span className="bg-purple-100 text-purple-950 font-bold px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] border border-purple-200">
+                                        🎤 {soloName}
                                       </span>
                                     )}
                                     {organistName && (
-                                      <span className="bg-sky-50 text-sky-950 font-semibold px-2 py-0.5 rounded text-xs border border-sky-200">
-                                        🎹 Đàn: {organistName}
+                                      <span className="bg-sky-50 text-sky-950 font-semibold px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] border border-sky-200">
+                                        🎹 {organistName}
                                       </span>
                                     )}
                                   </div>
@@ -411,15 +416,18 @@ export const MatrixScheduleView: React.FC<MatrixScheduleViewProps> = ({
                           })}
                         </div>
                       ) : (
-                        <span className="text-stone-400 font-medium italic text-xs hover:text-stone-700">+ Thêm</span>
+                        <span className="text-stone-400 font-medium italic text-[11px] sm:text-xs hover:text-stone-700">+ Thêm</span>
                       )}
                     </td>
                   );
                 })}
               </tr>
-            ))}
-          </tbody>
+            );
+          })}
+        </tbody>
         </table>
+        {/* Bottom padding buffer so Kết lễ never gets covered by scrollbar or mobile nav */}
+        <div className="h-6 sm:h-4 shrink-0 w-full bg-stone-50/50 border-t border-stone-200" />
       </div>
 
       {/* QUICK EDIT CELL MODAL */}
